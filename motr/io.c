@@ -105,16 +105,6 @@ static bool indexvec_segments_overlap(struct m0_indexvec *ivec)
 	return overlap;
 }
 
-M0_UNUSED static inline void indexvec_dump(struct m0_indexvec *ivec)
-{
-	uint32_t seg;
-
-	for (seg = 0; seg < SEG_NR(ivec); ++seg)
-		M0_LOG(M0_DEBUG, "seg# %d: [pos, +len) = [%"PRIu64
-				 ", +%"PRIu64")", seg, INDEX(ivec, seg),
-				 COUNT(ivec, seg));
-}
-
 /**
  * Sort the segments by ivec->iv_index order ... using bubble sort.
  * This is heavily based on m0t1fs/linux_kernel/file.c::indexvec_sort

@@ -3152,7 +3152,7 @@ static void server_is_down(void)
 	dix_index_init(&index, 1);
 	m0_fi_enable_once("cas_sdev_state", "sdev_fail");
 	rc = dix_common_idx_op(&index, 1, REQ_CREATE);
-	M0_UT_ASSERT(rc == -EBADFD);
+	M0_UT_ASSERT(rc == -EBADF);
 	dix_index_fini(&index);
 	ut_service_fini();
 }
