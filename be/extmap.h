@@ -108,6 +108,7 @@
 #include "lib/ext_xc.h"	   /* m0_ext_xc */
 #include "lib/types.h"     /* struct m0_uint128 */
 #include "lib/types_xc.h"  /* m0_uint128_xc */
+#include "lib/thread.h"    /* LAMBDA_T */
 #include "be/tx.h"
 #include "be/btree.h"
 #include "be/btree_xc.h"
