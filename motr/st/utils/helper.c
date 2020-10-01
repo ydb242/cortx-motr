@@ -1018,7 +1018,7 @@ int m0_utility_args_init(int argc, char **argv,
 						    &params->cup_block_count) !=
 						    0) {
 					  fprintf(stderr, "Invalid value "
-						  "%lu for -%c. Block "
+						  "%"PRIu64" for -%c. Block "
 						  "count should be > 0\n",
 						  params->cup_block_count,
 						  c);
@@ -1031,7 +1031,7 @@ int m0_utility_args_init(int argc, char **argv,
 						    &params->cup_trunc_len) !=
 						    0) {
 					fprintf(stderr, "Invalid value "
-						"%lu for -%c. Truncate "
+						"%"PRIu64" for -%c. Truncate "
 						"length should be "
 						"> 0\n",
 						params->cup_trunc_len,
