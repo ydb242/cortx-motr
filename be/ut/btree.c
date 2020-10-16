@@ -90,12 +90,13 @@ void m0_be_ut_btree_create_truncate(void)
 
 	/* create btree */
 	tree0 = create_tree();
-
+	m0_be_btree_fini(tree0);
 	m0_be_ut_seg_reload(ut_seg);
 	check(tree0);
 
 	/* truncate btree */
 	truncate_tree(tree0);
+	m0_be_btree_fini(tree0);
 
 	m0_be_ut_seg_reload(ut_seg);
 	m0_be_ut_seg_fini(ut_seg);
@@ -123,11 +124,12 @@ void m0_be_ut_btree_create_destroy(void)
 
 	/* create btrees */
 	tree0 = create_tree();
-
+	m0_be_btree_fini(tree0);
 	m0_be_ut_seg_reload(ut_seg);
 
 	check(tree0);
 	destroy_tree(tree0);
+	m0_be_btree_fini(tree0);
 
 	m0_be_ut_seg_reload(ut_seg);
 	m0_be_ut_seg_fini(ut_seg);
@@ -877,7 +879,6 @@ static void check(struct m0_be_btree *tree)
 
 	cursor_test(tree);
 	btree_dbg_print(tree);
-	m0_be_btree_fini(tree);
 	m0_free(op);
 }
 
