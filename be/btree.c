@@ -1491,6 +1491,13 @@ M0_INTERNAL void m0_be_btree_init(struct m0_be_btree *tree,
 	M0_ENTRY("tree=%p seg=%p", tree, seg);
 	M0_PRE(ops != NULL);
 
+	/*
+	 * It is possible that the tree lock was captured in a locked
+	 * state. After the segment is loaded again, the lock will be
+	 * locked. Some versions of libc refuse to re-initialise a locked lock.
+	 * Clean it up.
+	 */
+	M0_SET0(btree_rwlock(tree));
 	m0_rwlock_init(btree_rwlock(tree));
 	tree->bb_ops = ops;
 	tree->bb_seg = seg;

@@ -394,6 +394,8 @@ static int balloc_group_info_init(struct m0_balloc_group_info *gi,
 				 normal_zone_size,
 				 spare_zone_size, 0, 0, 0);
 #endif
+		/* See comment in m0_be_btree_init(). */
+		M0_SET0(bgi_mutex(gi));
 		m0_mutex_init(bgi_mutex(gi));
 	}
 	return rc;
@@ -963,6 +965,8 @@ static int balloc_init_internal(struct m0_balloc *bal,
 
 	bal->cb_be_seg = seg;
 	bal->cb_group_info = NULL;
+	/* See comment in m0_be_btree_init(). */
+	M0_SET0(&bal->cb_sb_mutex.bm_u.mutex);
 	m0_mutex_init(&bal->cb_sb_mutex.bm_u.mutex);
 
 	m0_be_btree_init(&bal->cb_db_group_desc, seg, &gd_btree_ops);
