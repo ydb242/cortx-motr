@@ -82,31 +82,6 @@ struct m0_conf_root *conf_root;
  *
  * Why not use a state machine?
  */
-/**
- * Client initialises these components, in this order. If something fails
- * it automatically reverses and moves back to IL_UNINITIALISED.
- *
- * Rule of thumb: if you need a goto, you are probably tracking some kind of
- *                state that should be added here instead.
- */
-enum initlift_states {
-	IL_UNINITIALISED = 0,
-	IL_NET, /* TODO: break this out */
-	IL_RPC, /* TODO: break this out */
-	IL_AST_THREAD,
-	IL_HA,
-	IL_CONFC,    /* Creates confc and stashes in m0c */
-	IL_POOLS,
-	IL_POOL_VERSION,
-	IL_RESOURCE_MANAGER,
-	IL_LAYOUT_DB,
-	IL_IDX_SERVICE,
-	IL_ROOT_FID, /* TODO: remove this m0t1fs ism */
-	IL_ADDB2,
-	IL_INITIALISED,
-	IL_FAILED,
-};
-
 /** Forward declarations for state callbacks */
 static int initlift_uninitialised(struct m0_sm *mach);
 static int initlift_net(struct m0_sm *mach);
@@ -374,7 +349,7 @@ static void initlift_move_next_floor(struct m0_client *m0c)
  * @param rc the failing rc.
  * @param m0c the client instance we are working with.
  */
-static void initlift_fail(int rc, struct m0_client *m0c)
+M0_INTERNAL void initlift_fail(int rc, struct m0_client *m0c)
 {
 	M0_PRE(rc != 0);
 	M0_PRE(m0c != NULL);
