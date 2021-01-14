@@ -112,7 +112,7 @@ void track_cob_btrees(struct m0_cob_domain *cdom, bool print_btree)
 void track_ad_btrees(struct stob_ad_0type_rec *rec, bool print_btree)
 {
 	struct m0_balloc         *m0balloc;
-	int 			  i;
+        int                       i;
 
 	m0balloc = container_of(rec->sa0_ad_domain->sad_ballroom,
 				struct m0_balloc, cb_ballroom);
@@ -259,6 +259,7 @@ int main(int argc, char *argv[])
 	char                    *path;
 	int                      rc;
 
+	// m0_node_uuid_string_set(NULL);
 	if (argc > 1 && m0_streq(argv[1], "be_recovery_run")) {
 		path = argc > 2 ? argv[2] : NULL;
 		be_recovery_run(path);

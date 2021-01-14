@@ -412,7 +412,6 @@ static int stob_ad_domain_init(struct m0_stob_type *type,
 	dom->sd_ops     = &stob_ad_domain_ops;
 	for (i = 0; i < EMAP_HT_SIZE; i++)
 		m0_be_emap_init(&adom->sad_adata_ht[i].sad_adata, seg);
-
 	ballroom = adom->sad_ballroom;
 	m0_balloc_init(b2m0(ballroom));
 	rc = ballroom->ab_ops->bo_init(ballroom, seg,
@@ -433,6 +432,7 @@ static int stob_ad_domain_init(struct m0_stob_type *type,
 			ballroom->ab_ops->bo_fini(ballroom);
 		for (i = 0; i < EMAP_HT_SIZE; i++)
 			m0_be_emap_fini(&adom->sad_adata_ht[i].sad_adata);
+
 		m0_free(dom);
 	} else {
 		m0_stob_ad_domain_bob_init(adom);
@@ -555,6 +555,7 @@ static int stob_ad_domain_create(struct m0_stob_type *type,
 		adom->sad_overwrite        = false;
 		strcpy(adom->sad_path, location_data);
 		m0_format_footer_update(adom);
+
 		for (i = 0; i < EMAP_HT_SIZE; i++) {
 			emap = &adom->sad_adata_ht[i].sad_adata;
 			m0_be_emap_init(emap, seg);
@@ -627,7 +628,7 @@ static int stob_ad_domain_destroy(struct m0_stob_type *type,
 						   &tx, location_data);
 		}
 		if (rc == 0)
-			M0_BE_FREE_PTR_SYNC(adom, seg, &tx);
+				M0_BE_FREE_PTR_SYNC(adom, seg, &tx);
 		m0_be_tx_close_sync(&tx);
 	}
 	m0_be_tx_fini(&tx);

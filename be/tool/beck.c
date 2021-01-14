@@ -1445,7 +1445,9 @@ static int emap_entry_lookup(struct m0_stob_ad_domain  *adom,
 	fid.f_container = prefix.u_hi;
 	fid.f_key = prefix.u_lo;
 	ht_idx = m0_stob_get_hash(&fid);
-
+	fid.f_container = prefix.u_hi;
+	fid.f_key = prefix.u_lo;
+	ht_idx = m0_stob_get_hash(&fid);
 	M0_LOG(M0_DEBUG, U128X_F, U128_P(&prefix));
 	rc = M0_BE_OP_SYNC_RET_WITH( &it->ec_op,
 	                m0_be_emap_lookup(&adom->sad_adata_ht[ht_idx].sad_adata,
@@ -3049,8 +3051,6 @@ static void cob_act(struct action *act, struct m0_be_tx *tx)
 							     sad_adata,
 							     &prefix, 0, &it),
 				    bo_u.u_emap.e_rc);
-		if (rc == 0)
-			m0_be_emap_close(&it);
 		else {
 			rc = M0_BE_OP_SYNC_RET(op,
 			       m0_be_emap_obj_insert(&adom->
