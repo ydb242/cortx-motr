@@ -112,7 +112,7 @@ void track_cob_btrees(struct m0_cob_domain *cdom, bool print_btree)
 void track_ad_btrees(struct stob_ad_0type_rec *rec, bool print_btree)
 {
 	struct m0_balloc         *m0balloc;
-        int                       i;
+	int 			  i;
 
 	m0balloc = container_of(rec->sa0_ad_domain->sad_ballroom,
 				struct m0_balloc, cb_ballroom);
