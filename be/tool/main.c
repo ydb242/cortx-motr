@@ -259,7 +259,6 @@ int main(int argc, char *argv[])
 	char                    *path;
 	int                      rc;
 
-	// m0_node_uuid_string_set(NULL);
 	if (argc > 1 && m0_streq(argv[1], "be_recovery_run")) {
 		path = argc > 2 ? argv[2] : NULL;
 		be_recovery_run(path);

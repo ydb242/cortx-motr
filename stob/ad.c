@@ -387,7 +387,6 @@ static int stob_ad_domain_init(struct m0_stob_type *type,
 	bool                       balloc_inited;
 	int                        rc = 0;
 	int			   i;
-
 	adom = stob_ad_domain_locate(location_data);
 	if (adom == NULL)
 		return M0_RC(-ENOENT);
@@ -628,7 +627,7 @@ static int stob_ad_domain_destroy(struct m0_stob_type *type,
 						   &tx, location_data);
 		}
 		if (rc == 0)
-				M0_BE_FREE_PTR_SYNC(adom, seg, &tx);
+		        M0_BE_FREE_PTR_SYNC(adom, seg, &tx);
 		m0_be_tx_close_sync(&tx);
 	}
 	m0_be_tx_fini(&tx);
@@ -922,6 +921,7 @@ static int stob_ad_destroy(struct m0_stob *stob, struct m0_dtx *tx)
 						 &tx->tx_betx, &op,
 						 &prefix),
 			   bo_u.u_emap.e_rc);
+=======
 	return M0_RC(rc);
 }
 

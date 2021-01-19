@@ -107,12 +107,13 @@ struct m0_ad_balloc_ops {
 };
 
 enum { AD_PATHLEN = 4096 };
-// Defines hash table size for struct m0_be_emap. This size should be pow of 2,
-// and maximum allowed size is 65536.
-#define EMAP_HT_SIZE 256
+
+/** Defines hash table size for struct m0_be_emap. This size should be pow of 2.
+ */
+enum { EMAP_HT_SIZE = 256 };
 
 struct m0_perf_ht {
-	struct m0_be_emap       sad_adata;
+        struct m0_be_emap       sad_adata;
 } M0_XCA_RECORD M0_XCA_DOMAIN(be);
 
 /** Defines hash table size for struct m0_be_emap. This size should be pow of 2.
