@@ -627,7 +627,7 @@ static int stob_ad_domain_destroy(struct m0_stob_type *type,
 						   &tx, location_data);
 		}
 		if (rc == 0)
-		        M0_BE_FREE_PTR_SYNC(adom, seg, &tx);
+			M0_BE_FREE_PTR_SYNC(adom, seg, &tx);
 		m0_be_tx_close_sync(&tx);
 	}
 	m0_be_tx_fini(&tx);
