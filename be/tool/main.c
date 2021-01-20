@@ -108,26 +108,34 @@ void track_cob_btrees(struct m0_cob_domain *cdom, bool print_btree)
 void track_ad_btrees(struct stob_ad_0type_rec *rec, bool print_btree)
 {
 	struct m0_balloc         *m0balloc;
+	int 			  i;
 
 	m0balloc = container_of(rec->sa0_ad_domain->sad_ballroom,
 				struct m0_balloc, cb_ballroom);
 
 	if (print_btree) {
-		M0_LOG(M0_ALWAYS, "em_mapping");
-		btree_dbg_print(&rec->sa0_ad_domain->sad_adata.em_mapping);
+		for (i = 0; i < EMAP_HT_SIZE; i++) {
+			M0_LOG(M0_ALWAYS, "em_mapping %d",i);
+			btree_dbg_print(&rec->sa0_ad_domain->sad_adata_ht[i].
+					      sad_adata.em_mapping);
+		}
 		M0_LOG(M0_ALWAYS, "grp_exts");
 		btree_dbg_print(&m0balloc->cb_db_group_extents);
 		M0_LOG(M0_ALWAYS, "grp_dsc");
 		btree_dbg_print(&m0balloc->cb_db_group_desc);
-	} else
-		M0_LOG(M0_ALWAYS,"M0_BE:AD em_mapping = %p"
-				 "cb_db_group_extents btree= %p "
-				 "cb_db_group_desc btree= %p",
-				 &rec->sa0_ad_domain->sad_adata.em_mapping,
-				 &m0balloc->cb_db_group_extents,
-				 &m0balloc->cb_db_group_desc);
-
+	} else {
+		for (i = 0; i < EMAP_HT_SIZE; i++) {
+			M0_LOG(M0_ALWAYS,"M0_BE:AD em_mapping = %p"
+				"cb_db_group_extents btree= %p "
+				"cb_db_group_desc btree= %p",
+				&rec->sa0_ad_domain->sad_adata_ht[i].sad_adata.
+				      em_mapping,
+				&m0balloc->cb_db_group_extents,
+				&m0balloc->cb_db_group_desc);
+                 }
+	}
 }
+
 static void scan_btree(struct m0_be_domain *dom, bool print_btree)
 {
 	int                     left;
@@ -166,7 +174,6 @@ static void scan_btree(struct m0_be_domain *dom, bool print_btree)
 	} m0_tl_endfor;
 
 }
-
 
 static void be_recovery_run(char *path)
 {
