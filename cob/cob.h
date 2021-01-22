@@ -271,7 +271,7 @@ struct m0_cob_domain {
 	struct m0_be_btree      cd_object_index[COB_HT_SIZE];
 	struct m0_be_btree      cd_namespace[COB_HT_SIZE];
 	struct m0_be_btree      cd_fileattr_basic[COB_HT_SIZE];
-	struct m0_be_btree      cd_fileattr_omg; // TODO- remove this
+	struct m0_be_btree      cd_fileattr_omg;
 	struct m0_be_btree      cd_fileattr_ea[COB_HT_SIZE];
 } M0_XCA_RECORD M0_XCA_DOMAIN(be);
 

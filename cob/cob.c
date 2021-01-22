@@ -971,7 +971,6 @@ static int cob_oi_lookup(struct m0_cob *cob)
 	 * We use cursor here because in some situations we need
 	 * to find most suitable position instead of exact location.
 	 */
- 	// TBD- Tejal
 	m0_be_btree_cursor_init(&cursor, &cob->co_dom->cd_object_index[ht_idx]);
 	rc = m0_be_btree_cursor_get_sync(&cursor, &start, true);
 	if (rc != 0) {
