@@ -135,6 +135,8 @@ struct m0_balloc_zone_param {
 	m0_bcount_t                     bzp_freeblocks;
 	m0_bcount_t                     bzp_fragments;
 	m0_bcount_t                     bzp_maxchunk;
+	struct m0_ext                   bzp_maxchunk_ext;
+	struct m0_ext                   bzp_curchunk_ext;
 	struct m0_list                  bzp_extents;
 };
 
