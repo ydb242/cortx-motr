@@ -612,7 +612,7 @@ static int balloc_sb_write(struct m0_balloc            *bal,
 	sb->bsb_last_check_time	= sb->bsb_format_time;
 	sb->bsb_mnt_count	= 0;
 	sb->bsb_max_mnt_count	= 1024;
-	sb->bsb_stripe_size	= 0;
+	sb->bsb_stripe_size	= (4 * 1024 * 1024) / req->bfr_blocksize;
 
 	rc = sb_update(bal, grp);
 	if (rc != 0)
@@ -2416,8 +2416,13 @@ repeat:
 			grp = m0_balloc_gn2info(bac->bac_ctxt, group);
 			// m0_balloc_debug_dump_group("searching group ...",
 			//			 grp);
-
-			rc = m0_balloc_trylock_group(grp);
+			/* use same group for small objectes */
+			if (len < bac->bac_ctxt->cb_sb.bsb_stripe_size ) {
+				m0_balloc_lock_group(grp);
+				rc = 0;
+			}
+			else
+				rc = m0_balloc_trylock_group(grp);
 			if (rc != 0) {
 				M0_LOG(M0_DEBUG, "grp=%d is busy", (int)group);
 				/* This group is under processing by others. */
