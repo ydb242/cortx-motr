@@ -921,7 +921,6 @@ static int stob_ad_destroy(struct m0_stob *stob, struct m0_dtx *tx)
 						 &tx->tx_betx, &op,
 						 &prefix),
 			   bo_u.u_emap.e_rc);
-=======
 	return M0_RC(rc);
 }
 
