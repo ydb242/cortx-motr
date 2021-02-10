@@ -1854,7 +1854,6 @@ uint64_t get_optimal_bs(struct m0_obj *obj, uint64_t obj_sz)
 	gsz = usz * pa->pa_N;
 	/* max 2-times pool-width deep, otherwise we may get -E2BIG */
 	max_bs = usz * 2 * pa->pa_P * pa->pa_N / (pa->pa_N + pa->pa_K + pa->pa_S);
-
 	VERB("usz=%lu pool="FID_F" (N,K,S,P)=(%u,%u,%u,%u) max_bs=%"PRId64"\n", usz,
 	     FID_P(&pver->pv_pool->po_id), pa->pa_N, pa->pa_K, pa->pa_S, pa->pa_P, max_bs);
 
