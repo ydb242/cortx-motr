@@ -64,5 +64,69 @@ For the sake of completeness below is a standard list of requirements for a pari
 
 6. Maximal parallelism. A read of contiguous user data with size equal to a data unit times the number of disks in the array should induce a single data unit read on all disks in the array (while requiring alignment only to a data unit boundary). This insures that maximum parallelism can be obtained.
 
+******************
+Design Highlights
+******************
+
+Present parity de-clustered layout is based on combinatorial layouts (see [5]), as opposed to so called block design layouts ([2]). The key observation behind this decision is that while block design based layouts strictly conform to the uniformity requirements mentioned above under all circumstances, they are difficult to build and pose artificial constraints on admissible values of (N, K, P). Combinatorial layouts, on the other hand, are easy to build for any (N, K, P) (provided 𝑁 + 2⋅𝐾≤𝑃), at the expense of only guaranteeing uniformity asymptotically, i.e., for a sufficiently large number of units and objects.
+
+***************************
+Functional Specification
+***************************
+
+Three major external interfaces are described in this specification:
+
+- a layout formula interface that generates a parity de-clustered layout by substituting parameters into a layout formula;
+
+- a layout interface that plugs layout into client and server IO sub-systems, and
+
+- a parity de-clustering demonstration program to analyze and simulate behavior of parity de-clustered layouts
+
+A client fetches a layout from a Layout Data-Base (LDB) by sending a lookup query. LDB query typically returns a layout formula that can be instantiated into a layout by substituting parameters such as object fid and current pool failure vector to obtain a layout. Note that parameters are typically managed by the resource framework: cached on clients and revoked on resource usage conflicts. Layout formulae and layouts are resources too.
+
+A file layout is used by a client to do IO against a file. The most basic layout IO interface is a mapping of file's logical namespace into storage objects' namespaces. A server uses layouts for SNS repair.
+
+************************
+Logical Specification
+************************
 
 
+************************
+Layout Mapping Function
+************************
+
+The key question of a parity de-clustered layout design is a method for construction of a layout mapping function satisfying given requirements. Let's outline one such method, starting with an informal description. Precise definition of this method is given at the end of this sub-section.
+
+First, some assumptions. A unit size is number of bytes in a data, parity or spare unit of a layout, denoted as U. For each layout the pool contains P objects (target objects). A target object is logically divided into frames of layout unit size. To specify a layout it is enough to specify how data, parity and spare units map to the target frames.
+
+Some notation. For any natural number k, let S(k) denote the set {0, ..., k - 1}. Data units in a given parity group are indexed by S(N). Parity units and spare units are indexed by S(K). Target objects for a layout are indexed by S(P). Target frames in a target object are indexed by the set R = {0, 1, ...}. Target address-space, the set of all frames in target objects is 𝑇 = 𝑅×𝑆(𝑃).
+
+We shall use g to denote a parity group (number), u for a unit (number) in a parity group, p for a target object (number) and r for a frame (number).
+
+Let's fix an enumeration of units within a parity group:
+
+To specify a layout mapping for an object one has to present a function
+
+- 𝑓:𝐺×𝑆(𝑁+2⋅𝐾) →𝑇
+
+mapping pairs (parity-group-number, unit-number) to pairs (target-object-frame, target-object-number) and also a function.
+
+- 𝑚:ℕ →𝐺×𝑆(𝑁+2⋅𝐾)×𝑆(𝑈)
+
+mapping logical byte offset in the object to the (parity-group-number, unit-number, byte-offset-in-unit) triples. In all cases considered in this document,
+
+::
+
+ m(offset) {
+
+         group_size = U*(N+2*K);
+
+         group = offset / group_size;
+
+         unit = (offset - group*group_size) / U;
+
+         unit_offset = offset - group*group_size - unit*U;
+
+         return (group, unit, unit_offset);
+
+  }
