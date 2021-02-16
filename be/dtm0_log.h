@@ -24,13 +24,13 @@
 #define __MOTR_BE_DTM0_LOG_H__
 
 #include "be/list.h"		/* m0_be_list */
+#include "be/tx.h"		/* M0_BE_TX_CAPTURE_PTR */
+#include "be/tx_credit.h"	/* m0_be_tx_credit */
 #include "dtm0/tx_desc.h"	/* m0_dtm0_tx_desc */
 #include "fid/fid.h"		/* m0_fid */
 #include "lib/buf.h"		/* m0_buf */
 
 /* import */
-struct m0_be_tx;
-struct m0_be_tx_credit;
 struct m0_dtm0_clk_src;
 
 /**
@@ -184,6 +184,7 @@ struct m0_dtm0_clk_src;
 
 enum m0_be_dtm0_log_credit_op {
 	M0_DTML_CREATE,
+	M0_DTML_DESTROY,
 	M0_DTML_SENT,
 	M0_DTML_EXECUTED,
 	M0_DTML_PERSISTENT,
@@ -203,32 +204,38 @@ struct m0_be_dtm0_log {
 	struct m0_mutex         dl_lock;  /* volatile structure */
 	struct m0_dtm0_clk_src *dl_cs;
 	struct m0_be_list      *dl_list;  /* persistent structure */
-	struct m0_tl           *dl_tlist; /* Volatile list */
+	struct m0_be_list      *dl_dlist; /* persistent structure */
+	struct m0_tl           *dl_tlist; /* volatile list */
 };
 
 // init/fini (for volatile fields)
 M0_INTERNAL int m0_be_dtm0_log_init(struct m0_be_dtm0_log **log,
                                     struct m0_dtm0_clk_src *cs,
                                     bool                    isvstore);
-M0_INTERNAL void m0_be_dtm0_log_fini(struct m0_be_dtm0_log **log,
-                                     bool                    isvstore);
+
+M0_INTERNAL void m0_be_dtm0_log_fini(struct m0_be_dtm0_log **log);
 
 // credit interface
 M0_INTERNAL void m0_be_dtm0_log_credit(enum m0_be_dtm0_log_credit_op op,
+                                       struct m0_be_dtm0_log        *log,
                                        struct m0_be_tx              *tx,
                                        struct m0_be_seg             *seg,
-                                       struct m0_be_tx_credit       *accum);
+                                       struct m0_be_tx_credit       *accum,
+                                       uint32_t                      nr_pa,
+                                       uint64_t                      size);
 // create/destroy
 M0_INTERNAL int m0_be_dtm0_log_create(struct m0_be_tx        *tx,
                                       struct m0_be_seg       *seg,
                                       struct m0_be_dtm0_log **out);
 
 M0_INTERNAL void m0_be_dtm0_log_destroy(struct m0_be_tx        *tx,
+					struct m0_be_seg       *seg,
                                         struct m0_be_dtm0_log **log);
 
 // operational interfaces
 M0_INTERNAL int m0_be_dtm0_log_update(struct m0_be_dtm0_log  *log,
                                       struct m0_be_tx        *tx,
+                                      struct m0_be_seg       *seg,
                                       struct m0_dtm0_tx_desc *txd,
                                       struct m0_buf          *pyld);
 
@@ -238,6 +245,7 @@ struct m0_dtm0_log_rec *m0_be_dtm0_log_find(struct m0_be_dtm0_log    *log,
 
 M0_INTERNAL int m0_be_dtm0_log_prune(struct m0_be_dtm0_log    *log,
                                      struct m0_be_tx          *tx,
+                                     struct m0_be_seg         *seg,
                                      const struct m0_dtm0_tid *id);
 #endif /* __MOTR_BE_DTM0_LOG_H__ */
 

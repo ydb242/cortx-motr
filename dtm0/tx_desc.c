@@ -30,6 +30,9 @@
 #include "dtm0/clk_src.h"
 #include "lib/misc.h"
 #define M0_TRACE_SUBSYSTEM M0_TRACE_SUBSYS_DTM
+#include "be/alloc.h"
+#include "be/op.h"
+#include "be/seg.h"
 #include "dtm0/tx_desc.h"
 #include "lib/assert.h" /* M0_PRE */
 #include "lib/memory.h" /* M0_ALLOC */
@@ -72,14 +75,17 @@ M0_INTERNAL bool m0_dtm0_tid__invariant(const struct m0_dtm0_tid *tid)
 }
 
 /* Writes a deep copy of "src" into "dst". */
-M0_INTERNAL int m0_dtm0_tx_desc_copy(const struct m0_dtm0_tx_desc *src,
-				     struct m0_dtm0_tx_desc       *dst)
+M0_INTERNAL int m0_dtm0_tx_desc_copy(struct m0_be_tx              *tx,
+                                     struct m0_be_seg             *seg,
+                                     const struct m0_dtm0_tx_desc *src,
+				     struct m0_dtm0_tx_desc       *dst,
+                                     bool                          ispstore)
 {
 	int      rc;
 
 	M0_PRE(m0_dtm0_tx_desc__invariant(src));
 
-	rc = m0_dtm0_tx_desc_init(dst, src->dtd_pg.dtpg_nr);
+	rc = m0_dtm0_tx_desc_init(tx, seg, dst, src->dtd_pg.dtpg_nr, ispstore);
 	if (rc != 0)
 		return rc;
 
@@ -91,20 +97,35 @@ M0_INTERNAL int m0_dtm0_tx_desc_copy(const struct m0_dtm0_tx_desc *src,
 	return 0;
 }
 
-M0_INTERNAL int m0_dtm0_tx_desc_init(struct m0_dtm0_tx_desc *td,
-				     uint32_t nr_pa)
+M0_INTERNAL int m0_dtm0_tx_desc_init(struct m0_be_tx        *tx,
+                                     struct m0_be_seg       *seg,
+                                     struct m0_dtm0_tx_desc *td,
+				     uint32_t                nr_pa,
+                                     bool                    ispstore)
 {
-	M0_ALLOC_ARR(td->dtd_pg.dtpg_pa, nr_pa);
-	if (td->dtd_pg.dtpg_pa == NULL)
-		return M0_ERR(-ENOMEM);
+	if (ispstore) {
+		M0_BE_ALLOC_ARR_SYNC(td->dtd_pg.dtpg_pa, nr_pa, seg, tx);
+	} else {
+		M0_ALLOC_ARR(td->dtd_pg.dtpg_pa, nr_pa);
+		if (td->dtd_pg.dtpg_pa == NULL)
+			return M0_ERR(-ENOMEM);
+	}
+
 	td->dtd_pg.dtpg_nr = nr_pa;
 	M0_POST(m0_dtm0_tx_desc__invariant(td));
 	return 0;
 }
 
-M0_INTERNAL void m0_dtm0_tx_desc_fini(struct m0_dtm0_tx_desc *td)
+M0_INTERNAL void m0_dtm0_tx_desc_fini(struct m0_be_tx        *tx,
+                                      struct m0_be_seg       *seg,
+                                      struct m0_dtm0_tx_desc *td,
+                                      bool                    ispstore)
 {
-	m0_free(td->dtd_pg.dtpg_pa);
+	if (ispstore) {
+		M0_BE_FREE_PTR_SYNC(td->dtd_pg.dtpg_pa, seg, tx);
+	} else {
+		m0_free(td->dtd_pg.dtpg_pa);
+	}
 	M0_SET0(td);
 }
 

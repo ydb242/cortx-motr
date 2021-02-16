@@ -120,14 +120,23 @@ struct m0_dtm0_tx_desc {
 } M0_XCA_RECORD M0_XCA_DOMAIN(rpc|be);
 
 /** Writes a deep copy of "src" into "dst". */
-M0_INTERNAL int m0_dtm0_tx_desc_copy(const struct m0_dtm0_tx_desc *src,
-				     struct m0_dtm0_tx_desc       *dst);
+M0_INTERNAL int m0_dtm0_tx_desc_copy(struct m0_be_tx              *tx,
+                                     struct m0_be_seg             *seg,
+                                     const struct m0_dtm0_tx_desc *src,
+				     struct m0_dtm0_tx_desc       *dst,
+                                     bool                          ispstore);
 
 /** Creates a new tx descriptor with the given number of participants. */
-M0_INTERNAL int m0_dtm0_tx_desc_init(struct m0_dtm0_tx_desc *td,
-				     uint32_t                nr_pa);
+M0_INTERNAL int m0_dtm0_tx_desc_init(struct m0_be_tx        *tx,
+                                     struct m0_be_seg       *seg,
+                                     struct m0_dtm0_tx_desc *td,
+				     uint32_t                nr_pa,
+                                     bool                    ispstore);
 
-M0_INTERNAL void m0_dtm0_tx_desc_fini(struct m0_dtm0_tx_desc *td);
+M0_INTERNAL void m0_dtm0_tx_desc_fini(struct m0_be_tx        *tx,
+                                      struct m0_be_seg       *seg,
+                                      struct m0_dtm0_tx_desc *td,
+                                      bool                    ispstore);
 
 M0_INTERNAL int m0_dtm0_tid_cmp(struct m0_dtm0_clk_src   *cs,
 				const struct m0_dtm0_tid *left,
