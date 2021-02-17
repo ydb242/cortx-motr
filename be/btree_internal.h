@@ -43,7 +43,7 @@ enum {
 struct be_btree_key_val  {
 	char inlkey[128];
 	void *btree_key;
-	char inlval[4096];
+	char inlval[1024];
 	void *btree_val;
 } M0_XCA_RECORD M0_XCA_DOMAIN(be);
 
@@ -59,7 +59,6 @@ struct m0_be_bnode {
 	struct be_btree_key_val      bt_kv_arr[KV_NR]; /* Array of key-vals */
 	struct m0_be_bnode          *bt_child_arr[KV_NR + 1]; /* childnode array */
 	struct m0_format_footer      bt_footer;  /* Footer of node */
-	struct be_btree_key_val		 bkv; 	/* temp keyval to facilitate movement of kvs*/
 } M0_XCA_RECORD M0_XCA_DOMAIN(be);
 M0_BASSERT(sizeof(bool) == 1);
 

@@ -1456,7 +1456,7 @@ static void btree_save(struct m0_be_btree        *tree,
 {
 	m0_bcount_t        ksz;
 	m0_bcount_t        vsz;
-	struct be_btree_key_val  *new_kv;
+	struct be_btree_key_val  new_kv;
 	struct be_btree_key_val  *cur_kv;
 	bool               val_overflow = false;
 
@@ -1482,7 +1482,6 @@ static void btree_save(struct m0_be_btree        *tree,
 	
 	m0_be_op_active(op);
 	m0_rwlock_write_lock(btree_rwlock(tree));
-	new_kv = &tree->bb_root->bkv;
 	if (anchor != NULL) {
 		anchor->ba_tree = tree;
 		anchor->ba_write = true;
@@ -1519,8 +1518,10 @@ static void btree_save(struct m0_be_btree        *tree,
 				 * old value in this case.
 				 */
 				if (val != NULL) {
+					memcpy(cur_kv->inlval, val->b_addr, val->b_nob);
 					memcpy(cur_kv->btree_val, val->b_addr,
 					       val->b_nob);
+					cur_kv->btree_val = &cur_kv->inlval;
 					mem_update(tree, tx, cur_kv->btree_val,
 						   val->b_nob);
 				} else
@@ -1533,29 +1534,29 @@ static void btree_save(struct m0_be_btree        *tree,
 		    (cur_kv == NULL || val_overflow)) {
 			/* Avoid CPU alignment overhead on values. */
 			ksz = m0_align(key->b_nob, sizeof(void*));
-			new_kv->btree_key =
+			new_kv.btree_key =
 				      mem_alloc(tree, tx, ksz + vsz, zonemask);
-			new_kv->btree_val = new_kv->btree_key + ksz;
-			memcpy(new_kv->btree_key, key->b_addr, key->b_nob);
-			memset(new_kv->btree_key + key->b_nob, 0,
+			new_kv.btree_val = new_kv.btree_key + ksz;
+			memcpy(new_kv.btree_key, key->b_addr, key->b_nob);
+			memset(new_kv.btree_key + key->b_nob, 0,
 							ksz - key->b_nob);
 			if (val != NULL) {
-				memcpy(new_kv->btree_val, val->b_addr, vsz);
+				memcpy(new_kv.btree_val, val->b_addr, vsz);
 				mem_update(tree, tx,
-						new_kv->btree_key, ksz + vsz);
+						new_kv.btree_key, ksz + vsz);
 			} else {
-				mem_update(tree, tx, new_kv->btree_key, ksz);
-				anchor->ba_value.b_addr = new_kv->btree_val;
+				mem_update(tree, tx, new_kv.btree_key, ksz);
+				anchor->ba_value.b_addr = new_kv.btree_val;
 			}
 
 			if(tree->bb_ops->ko_type != M0_BBT_CAS_CTG)
 			{
-				memcpy(new_kv->inlkey, key->b_addr, key->b_nob);
-				memcpy(new_kv->inlval, val->b_addr, val->b_nob);
-				M0_LOG(M0_ERROR,"YB:Inline key %s actual key %s",(char *)new_kv->inlkey,(char *)new_kv->btree_key);
+				memcpy(new_kv.inlkey, key->b_addr, key->b_nob);
+				memcpy(new_kv.inlval, val->b_addr, val->b_nob);
+				M0_LOG(M0_ERROR,"YB:Inline key %s actual key %s",(char *)new_kv.inlkey,(char *)new_kv.btree_key);
 			}
 
-			be_btree_insert_newkey(tree, tx, new_kv);
+			be_btree_insert_newkey(tree, tx, &new_kv);
 		}
 	} else {
 fi_exist:
@@ -1563,7 +1564,6 @@ fi_exist:
 		M0_LOG(M0_NOTICE, "the key entry at %p already exist",
 			key->b_addr);
 	}
-	new_kv = NULL;
 	if (anchor == NULL)
 		m0_rwlock_write_unlock(btree_rwlock(tree));
 	m0_be_op_done(op);
