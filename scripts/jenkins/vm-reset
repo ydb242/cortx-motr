@@ -163,7 +163,7 @@ main() {
     vm_snapshot_revert $vm_id $snapshot_id
     vm_power_state_set $vm_id on
 
-    which netcat || true; which nc || true; which nmap || true  # XXX DELETEME
+    sleep 300
 }
 
 main
