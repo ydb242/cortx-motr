@@ -174,7 +174,7 @@ M0_INTERNAL void m0_rpc_frm_constraints_get_defaults(struct
 	M0_ENTRY();
 
 	/** @todo XXX decide default values for constraints */
-	c->fc_max_nr_packets_enqed     = 100;
+	c->fc_max_nr_packets_enqed     = 500;
 	c->fc_max_nr_segments          = 128;
 	c->fc_max_packet_size          = 4096;
 	c->fc_max_nr_bytes_accumulated = 4096;
