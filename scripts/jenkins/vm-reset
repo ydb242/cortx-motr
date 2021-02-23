@@ -128,8 +128,8 @@ vm_snapshot_revert() {
           )
     >&2 jq -r '.message' <<< "$resp"
     [[ $(jq '.success' <<< "$resp") == true ]] || die 'Cannot revert snapshot'
-    #sleep 120  # XXX Can we do better?i
-    wait_till $vm_id unknown
+    sleep 120  # XXX Can we do better?i
+    #wait_till $vm_id unknown
     wait_till $vm_id off
 }
 
