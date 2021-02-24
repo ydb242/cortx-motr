@@ -119,7 +119,7 @@ static void m0_dtm0_dtx_free(struct m0_dtm0_dtx *dtx)
 {
 	M0_PRE(dtx != NULL);
 	m0_sm_fini(&dtx->dd_sm);
-	m0_dtm0_tx_desc_fini(&dtx->dd_txd);
+	m0_dtm0_tx_desc_fini(NULL, NULL, &dtx->dd_txd, false);
 	m0_free(dtx);
 }
 
@@ -142,7 +142,7 @@ static int m0_dtm0_dtx_open(struct m0_dtm0_dtx  *dtx,
 			    uint32_t             nr)
 {
 	M0_PRE(dtx != NULL);
-	return m0_dtm0_tx_desc_init(&dtx->dd_txd, nr);
+	return m0_dtm0_tx_desc_init(NULL, NULL, &dtx->dd_txd, nr, false);
 }
 
 static int m0_dtm0_dtx_assign(struct m0_dtm0_dtx  *dtx,
@@ -265,7 +265,8 @@ M0_INTERNAL int m0_dtx0_copy_txd(const struct m0_dtx    *dtx,
 		return 0;
 	}
 
-	return m0_dtm0_tx_desc_copy(&dtx->tx_dtx->dd_txd, dst);
+	return m0_dtm0_tx_desc_copy(NULL, NULL, &dtx->tx_dtx->dd_txd, dst,
+                                    false);
 }
 
 
