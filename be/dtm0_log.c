@@ -33,11 +33,11 @@ enum {
 };
 
 /* Volatile list */
-M0_TL_DESCR_DEFINE(lrec, "DTM0 Volatile Log", static, struct m0_dtm0_log_rec,
+M0_TL_DESCR_DEFINE(vlrec, "DTM0 Volatile Log", static, struct m0_dtm0_log_rec,
                    dlr_tlink, dlr_magic, M0_BE_DTM_LREC_MAGIX,
                    M0_BE_DTM_LOG_MAGIX);
 
-M0_TL_DEFINE(lrec, static, struct m0_dtm0_log_rec);
+M0_TL_DEFINE(vlrec, static, struct m0_dtm0_log_rec);
 
 /* Persistent list */
 M0_BE_LIST_DESCR_DEFINE(plrec, "DTM0 Persistent Log", static,
@@ -50,14 +50,15 @@ static bool m0_be_dtm0_log__invariant(const struct m0_be_dtm0_log *log)
 {
 	return _0C(log != NULL) &&
 	       _0C(log->dl_cs != NULL) &&
-	       _0C(lrec_tlist_invariant(log->dl_tlist));
+	       (log->dl_ispstore ?: _0C(vlrec_tlist_invariant(log->dl_tlist)));
 }
 
-static bool m0_dtm0_log_rec__invariant(const struct m0_dtm0_log_rec *rec)
+static bool m0_dtm0_log_rec__invariant(const struct m0_dtm0_log_rec *rec,
+                                       bool                          ispstore)
 {
 	return _0C(rec != NULL) &&
 	       _0C(m0_dtm0_tx_desc__invariant(&rec->dlr_txd)) &&
-	       _0C(m0_tlink_invariant(&lrec_tl, rec));
+	       (ispstore ?: _0C(m0_tlink_invariant(&vlrec_tl, rec)));
 }
 
 M0_INTERNAL int m0_be_dtm0_log_init(struct m0_be_dtm0_log **out,
@@ -83,7 +84,7 @@ M0_INTERNAL int m0_be_dtm0_log_init(struct m0_be_dtm0_log **out,
 			return M0_ERR(-ENOMEM);
 		}
 
-		lrec_tlist_init(log->dl_tlist);
+		vlrec_tlist_init(log->dl_tlist);
 		*out = log;
 	}
 
@@ -102,7 +103,7 @@ M0_INTERNAL void m0_be_dtm0_log_fini(struct m0_be_dtm0_log **log)
 	plog->dl_cs = NULL;
 
 	if (!plog->dl_ispstore) {
-		lrec_tlist_fini(plog->dl_tlist);
+		vlrec_tlist_fini(plog->dl_tlist);
 		m0_free(plog->dl_tlist);
 		m0_free(plog);
 		*log = NULL;
@@ -229,7 +230,7 @@ m0_be_dtm0_log_find__vlist(struct m0_be_dtm0_log    *log,
                            const struct m0_dtm0_tid *id)
 
 {
-	return m0_tl_find(lrec, rec, log->dl_tlist,
+	return m0_tl_find(vlrec, rec, log->dl_tlist,
 			  m0_dtm0_tid_cmp(log->dl_cs,
 					  &rec->dlr_txd.dtd_id,
 					  id) == M0_DTS_EQ);
@@ -376,7 +377,7 @@ static int m0_be_dtm0_log__insert(struct m0_be_dtm0_log  *log,
 		plrec_be_tlink_create(rec, tx);
 		plrec_be_list_add_tail(log->dl_list, tx, rec);
 	} else {
-		lrec_tlink_init_at_tail(rec, log->dl_tlist);
+		vlrec_tlink_init_at_tail(rec, log->dl_tlist);
 	}
 
 	return rc;
@@ -398,7 +399,7 @@ static int m0_be_dtm0_log__set(struct m0_be_dtm0_log  *log,
 	struct m0_dtm0_tx_pa   *dtpg_pa  = txd->dtd_pg.dtpg_pa;
 	uint32_t                num_pa   = ltxd->dtd_pg.dtpg_nr;
 
-	M0_PRE(m0_dtm0_log_rec__invariant(rec));
+	M0_PRE(m0_dtm0_log_rec__invariant(rec, log->dl_ispstore));
 
 	/* Attach payload to log if it is not attached */
 	if (!m0_dtm0_txr_rec_is_set(lpyld) && m0_dtm0_txr_rec_is_set(pyld)) {
@@ -451,7 +452,7 @@ static int m0_be_dtm0_log_prune__vlist(struct m0_be_dtm0_log    *log,
 	struct m0_dtm0_log_rec *rec;
 	struct m0_dtm0_log_rec *currec;
 
-	m0_tl_for (lrec, log->dl_tlist, rec) {
+	m0_tl_for (vlrec, log->dl_tlist, rec) {
 		if (!m0_dtm0_is_rec_is_stable(&rec->dlr_txd.dtd_pg))
 			return M0_ERR(-EPROTO);
 
@@ -464,8 +465,8 @@ static int m0_be_dtm0_log_prune__vlist(struct m0_be_dtm0_log    *log,
 	if (rc != M0_DTS_EQ)
 		return M0_ERR(-ENOENT);
 
-	while ((currec = lrec_tlist_pop(log->dl_tlist)) != rec) {
-		M0_ASSERT(m0_dtm0_log_rec__invariant(currec));
+	while ((currec = vlrec_tlist_pop(log->dl_tlist)) != rec) {
+		M0_ASSERT(m0_dtm0_log_rec__invariant(currec, log->dl_ispstore));
 		m0_be_dtm0_log_rec_fini(log, tx, seg, &currec);
 	}
 
@@ -501,6 +502,8 @@ static int m0_be_dtm0_log_prune__plist(struct m0_be_dtm0_log    *log,
 	if (rc != M0_DTS_EQ)
 		return M0_ERR(-ENOENT);
 
+	/* TODO: Prepare transaction */
+	/* TODO: Open Transaction */
 	while ((currec = plrec_be_list_head(log->dl_list))) {
 		if (currec != rec) {
 			plrec_be_list_del(log->dl_list, tx, currec);
@@ -513,6 +516,7 @@ static int m0_be_dtm0_log_prune__plist(struct m0_be_dtm0_log    *log,
 	plrec_be_list_del(log->dl_list, tx, rec);
 	plrec_be_tlink_destroy(rec, tx);
 	m0_be_dtm0_log_rec_fini(log, tx, seg, &rec);
+	/* TODO: Close transaction */
 	return 0;
 }
 
