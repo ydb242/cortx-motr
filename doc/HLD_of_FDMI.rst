@@ -285,3 +285,173 @@ NB
 ===
 
 Please note, the Source is responsible for initial record locking (incrementing ref counter), but FDMI is responsible for further record release.
+
+*********************
+fdmi source dock fom
+*********************
+
+FDMI source dock FOM implements the main control flow for FDMI source dock:
+
+- Takes out posted FDMI records
+
+- Examines filters
+
+- Sends notifications to FDMI plugins
+
+- Analyzes FDMI plugin responses
+
+
+Normal workflow
+================
+
+FDMI source dock FOM remains in an idle state if no FDMI record is posted (FDMI record queue is empty). If any FDMI record is posted, the FOM switches to busy state, takes out FDMI record from a queue and starts analysis.
+
+Before examining against all the filters, FOM requests filter list from filterc. On getting filter list, FOM iterates throw the filter list and examines filter one by one. If filters number is quite big, possible option is to limit a number of filters examined in one FOM invocation to avoid task blocking.
+
+To examine a filter, FOM builds filter execution plan. Filter execution plan is a tree structure, with expressions specified in its nodes.
+
+Each expression is described by elementary operation to execute and one or two operands. Operand may be a constant value, already calculated result of previous condition check or FDMI record specific field value.
+
+FDMI source dock calculates all expressions by itself. If some of the operands is FDMI record specific field value, then source dock executes callback provided by FDMI source to get operand value.
+
+Also, operations supported during filter execution by FDMI source dock can be extended. So FDMI source can add new operation codes and corresponding handlers in order to support processing data types that are specific to FDMI source. Operation overloading is not supported, so if FDMI source want to define multiplication for some “non-standard” type, it should add new operation and handler for that operation.
+
+If no filter shows a match for a FDMI record, the record is released. To inform FDMI source that this record is no more needed for FDMI system, FDMI generic source interface function “decrease record reference counter” is used.
+
+If one or more filters match the FDMI record, the record is scheduled to be sent to a particular FDMI node(s). If several filters matched, the following operations are performed to optimize data flow:
+
+- Send FDMI record only once to a particular FDMI node (filter provides RCP endpoint to communicate with)
+
+- Specify a list of matched filters, include only filters that are related to the node
+
+- On receipt, FDMI plugin dock is responsible for dispatching received FDMI records and pass it to plugins according to specified matched filters list
+
+In order to manage FDMI records i/o operations, the following information should be stored as FDMI source dock context information:
+
+- Sent FDMI record is stored in a FDMI source dock communication context
+
+- Relation between destination Filter Id and FDMI record id being sent to the specified Filter ID
+
+  - Map <Filter Id, FDMI record id> may be used in this case
+
+  - This information is needed to handle Corner case “Mero instance running “FDMI plugin dock” death” – see below.
+
+FDMI record being sent is serialized using FDMI generic source interface function “Xcode functions”
+
+On sending FDMI record its reference counter is increased: FDMI generic source interface function “increase record reference counter” is used.
+
+FDMI source dock increments internal FDMI record reference counter for the FDMI record being sent for each send operation.
+
+On FDMI record receipt, FDMI plugin dock should answer with a reply that is understood as a data delivery acknowledgement. The data acknowledgment should be sent as soon as possible – no blocking operations are allowed.
+
+On receiving data acknowledgement internal FDMI record reference counter for the FDMI record is decremented. If internal reference counter becomes 0, FDMI record is removed from the FDMI source dock communication context.
+
+After FDMI record is handled by all involved plugins, FDMI plugin dock should send FDMI record release request to the FDMI record originator (FDMI source dock). On receiving this request, FDMI source dock removes appropriate pair <Filter Id, FDMI record id> from its context and informs FDMI source that the record is released. FDMI generic source interface function “decrease record reference counter” is used for this purpose. If FDMI source reference counter for a particular FDMI record becomes 0, FDMI source may release this FDMI record.
+
+NOTE: What value should be returned if “Test filter condition” cannot calculate particular filter? “record mismatch” (legal ret code) or “some error ret code”?
+
+*********************
+Filters set support
+*********************
+
+FilterC id responsible for storing local copy of filters database and supporting its consistency. By request FilterC returns a set of filters, related to specified FDMI record type. Filter set request/response operation is simple and easy to execute, because a pointer to a local storage is returned. It allows FDMI source dock to re-request filter set from FilterC every time it needs it without any resources over usage. No any additional actions should be done by FDMI source dock to maintain filter set consistency.
+
+Corner cases
+===============
+
+Special handling should be applied for the following corner cases:
+
+- Motr instance running “FDMI plugin dock” death
+
+- FDMI filter is disabled
+
+Motr instance running “FDMI plugin dock” death may cause 2 cases:
+
+- RPC error while sending FDMI record to a FDMI source dock. No data acknowledgement received.
+
+- No “FDMI record release” request is received from FDMI plugin doc
+
+If RPC error while sending FDMI record to a FDMI source dock appears, FDMI source dock should decrement internal FDMI record reference counter and FDMI Source specific reference counter, following general logic described above. In this case all the FDMI record context information is stored in the communication context; it makes it obvious how to fill in parameters for interface functions calls.
+
+“FDMI record release” request is not received from FDMI plugin dock case is not detected by FDMI source dock explicitly. This case may cause storing FDMI records on source during unpredictable time period (depends on FDMI source domain: it may store FDMI records permanently until receiving from Plugin confirmation on FDMI record handling). Possible ways to escape the described issue:
+
+- Based on some internal criteria, FDMI source resets reference counter information and re-posts FDMI record
+
+- FDMI source dock receives notification on a death of the node running FDMI plugin dock. Notification is sent by HA.
+
+In the latter case FDMI source dock should inform FDMI source to release all the FDMI records that were sent to plugins that were hosted on the dead node. In order to do it, context information stored as relation between destination Filter Id and FDMI record id <Filter Id, FDMI record id > is used: all filters related to the dead node may be determined by EP address. The same handling that is done for “FDMI record release request” should be done in this case for all the FDMI records, bound to the specified filters id.
+
+FDMI filter may be disabled by plugin itself or by some 3rd parties (administrator, HA, etc.). On filter state change (disabling the filter) a signal is sent to FDMI source dock. Upon receiving this signal, FDMI source dock iterates through the stored map <Filter Id, FDMI record id> and check each filter status. If a filter status is found to be disabled, the same handling that is done for “FDMI record release request” should be done for all the FDMI records, bound to the specified filter id.
+
+****************
+FilterD
+****************
+
+FDMI plugin creates filter in order to specify criteria for FDMI records it is interested in. FDMI filter service (filterD) maintains central database of the FDMI filters existing in Motr cluster. There is only one (possibly duplicated) motr instance with filterD service in the whole Motr cluster. FilterD provides to users read/write access to its database via RPC requests.
+
+FilterD service is started as a part of chosen for this purpose mero instance. Address of filterD service endpoint is stored in confd database. FilterD database is empty after startup.
+
+FilterD database is protected by distributed read/write lock. When filterD database should be changed, filterD service acquires exclusive write lock from Resource Manager (RM), thus invalidating all read locks held by database readers. This mechanism is used to notify readers about filterD database changes, forcing them to re-read database content afterwards.
+
+There are two types of filterD users:
+
+- FDMI plugin dock
+
+- FDMI filter client (filterC)
+
+FDMI filter description stored in database contains following fields:
+
+- Filter ID
+
+- Filter conditions stored in serialized form
+
+- RPC endpoint of the FDMI plugin dock that registered a filter
+
+- Node on which FDMI plugin dock that registered a filter is running
+
+FDMI plugin dock can issue following requests:
+
+- Add filter with provided description
+
+- Remove filter by filter ID
+
+- Activate filter by filter ID
+
+- Deactivate filter by filter ID
+
+- Remove all filters by FDMI plugin dock RPC endpoint
+
+Also there are other events that cause some filters deactivation in database:
+
+- HA notification about node death
+
+Filters stored in database are grouped by FDMI record type ID they are intended for.
+
+FilterD clients can issue following queries to filterD:
+
+- Get all FDMI record type ID’s known to filterD
+
+- Get all FDMI filters registered for specific FDMI record type ID
+
+NB
+====
+
+Initial implementation of filterD will be based on confd. Actually, two types of conf objects will be added to confd database: directory of FDMI record types IDs and directory of filter descriptions for specific FDMI record type ID.
+
+This implementation makes handling of HA notifications on filterD impossible, because confd doesn’t track HA statuses for conf objects.
+
+********
+FilterC
+********
+
+FilterC is a part of Motr instance that caches locally filters obtained from filterD. FilterC is initialized by FDMI source dock service at its startup.
+
+Also, filterC have a channel in its context which is signaled when some filter state is changed from enabled to disabled.
+
+FilterC achieves local cache consistency with filterD database content by using distributed read/write lock mechanism. FilterD database change is the only reason for filterC local cache update. HA notifications about filter or node death are ignored by filterC.
+
+NB
+===
+
+Initial implementation of filterC will be based on confc. So confc will cache filter descriptions locally. In that case implementation of filterC channel for signaling disabled filters is quite problematic.
+
