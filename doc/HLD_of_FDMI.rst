@@ -86,7 +86,7 @@ FDMI consists of APIs implementing particular roles in accordance with FDMI use 
 
   - Self-diagnostic (TBD)
   
-  *********************
+*********************
 FDMI plug-in dock
 *********************
 
