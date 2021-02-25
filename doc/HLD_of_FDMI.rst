@@ -197,6 +197,184 @@ Interfaces
 
 - FDMI source dock FOM
 
+*************************
+fdmi plugin registration
+*************************
+
+Filter id:
+
+- Expected to be 128 bits long
+
+- Filter id is provided by plug-in creator
+
+- Providing filter id uniqueness is a responsibility of plug-in creator
+
+- Filter id may reuse m0_fid structure declaration
+
+TBD
+====
+
+A possible situation is pluging being notified with filter id that is already announced inactive, which change did not reach the source to the moment of emitting notification. Should the id be passed to plugin by FDMI?
+
+Another thing to consider on: what should be done by FDMI in case filter id arrived in notification is unknown to the node, i.e. no match to any locally registered filter rule encountered?
+
+complimentary case occurs when plugin was just fed with FDMI record and did not instructed FDMI to release the one yet. Instead, it declares the corresponding filter instance to be de-activated. Current approach implies that plug-in is responsible for proper issuing release commands once it was fed with FDMI record, disregarding filter activation aspect.
+
+**************************
+fdmi plugin dock fom
+**************************
+
+Received FDMI record goes directly to Plugin Dock’s FOM. At this time a new session re-using incoming RPC connection needs to be created and stored in communication context being associated with fdmi record id. Immediately at this step RPC reply is sent confirming fdmi record delivery.
+
+Per filter id, corresponding plug-in is called feeding it with fdmi data, fdmi record id and filter id specific to the plug-in. Every successful plug-in feed results in incrementing fdmi record id reference counter. When done with the ids, FOM needs to test if at least a single feed succeeded. In case it was no success, i.e. there was not a single active filter encountered, or plug-ins never confirmed fdmi record acceptance, the fdmi record has to be released immediately.
+
+Plug-in decides on its own when to report fdmi original record to be released by Source. It calls Plug-in Dock about releasing particular record identified by fdmi record id. In context of the call fdmi record reference counter is decremented locally, and in case the reference counter gets to 0, the corresponding Source is called via RPC to release the record (see Normal workflow, FDMI Source Dock: Release Request from Plug-in).
+
+
+***************************************
+fdmi plugin implementation guideline
+***************************************
+
+The main logic behind making use of a FDMI plug-in is a subscription to some events in sources that comply with conditions described in filters that plug-in registers at its start. In case some source record matches with at least one filter, the source-originated record is routed to corresponding plug-in.
+
+Plug-in responsibilities
+=========================
+
+During standard initialization workflow plug-in:
+
+- Obtains private Plug-in Dock callback interface
+
+- Registers set of filters, where filter definition:
+
+  - Identifies FDMI record type to be watched
+
+  - Provides plug-in callback interface
+
+  - Provides description of condition(s) the source record to meet to invoke notification
+
+NB
+===
+
+Condition description syntax must follow source functionality completely and unambiguously. Source of the type specified by filter description must understand every elementary construct of condition definition. This way the evolution of filter definition syntax is going to be driven by evolution of source functionality.
+
+NB
+===
+
+Source is responsible for validation of filter definition. This may result in deactivating filters that violate syntax rules the particular source supports. The facts of syntax violation ideally must become known some way to Mero cloud admin staff.
+
+Starts subscription by activating registered filters. Opaquely for the plug-in the filter set is propagated among Mero nodes running FDMI Source Dock role which enables source record filtering and notifications.
+
+During active subscription workflow looks like following:
+
+- Plug-in is called back with:
+
+  - FDMI record id
+
+  - FDMI record data
+
+  - Filter id indicating the filter that signaled during the original source record processing
+
+- Plug-in must keep trace of FDMI record (identified by FDMI record id globally unique across the Mero cloud) during its internal processing.
+
+- Plug-in must return from the callback as quick as possible to not block other callback interfaces from being called. Plug-in writers must take into account the fact that several plug-ins may be registered simultaneously, and therefore, must do their best to provide smooth cooperation among those.
+
+- However plug-in is allowed to take as much time as required for FDMI record processing. During the entire processing the FDMI record remains locked in its source.
+
+- When done with the record, plug-in is responsible for the record release.
+
+- Plug-in is allowed to activate/deactivate any subset of its registered filters. The decision making is entirely on plug-in’s side.
+
+- The same way plug-in is allowed to de-register and quit any time it wants. The decision making is again entirely on plug-in’s side. After de-registering itself the plug-in is not allowed to call private FDMI Plug-in Dock in part of filter activation/deactivation as well as fdmi record releasing. The said actions become available only after registering filter set another time.
+
+***************************
+IMPLEMENTATION PLAN
+***************************
+
+Phase 1
+
+#. Implement FDMI service
+
+#. FDMI source dock
+
+   #. FDMI source dock API
+
+   #. Generic FDMI records handling (check against filters, send matched records (only one recipient is supported))
+
+   #. Handle FDMI records deferred release
+
+#. FOL as FDMI source support
+
+   #. Generic FDMI source support
+
+   #. Limited FOL data analysis (operation code only)
+
+#. Filters
+
+   #. Simplified filters storing and propagation (use confd, confc)
+
+   #. Static filter configuration
+
+   #. Limited filtering operation set
+
+   #. Generic filters execution
+
+#. FDMI plugin dock
+
+   #. FDMI plugin dock API
+
+   #. Generic FDMI records handling (receive records, pass records to target filter)
+
+#. Sample echo plugin
+
+Backlog
+========
+
+#. Filters
+
+   #. FilterD, FilterC
+
+   #. Full filtering operation set
+
+   #. Register/deregister filter command
+
+   #. Enable/disable filter command
+
+   #. Filter sanity check
+
+   #. Query language to describe filters
+
+#. FDMI Source dock
+
+   #. Multiple localities support
+
+   #. Filters validation
+
+   #. FDMI kernel mode support
+
+   #. Support several concurrent RPC connections to clients (FDMI plugin docks)
+
+#. FDMI Plugin dock
+
+   #. Filter management (register/enable/disable)
+
+#. HA support (node/filter is dead) in
+
+   #. FDMI source dock
+
+   #. FDMI plugin dock
+
+   #. Filters subsystem
+
+#. FOL as FDMI source support
+
+   #. FOL data full analysis support
+
+   #. Transactions support (rollback/roll-forward)
+
+#. ADDB diagnostic support in both FDMI source dock and plugin dock
+
+#. ADDB as FDMI source support
+
   - Normal workflow
 
   - FDMI source: filters set support
