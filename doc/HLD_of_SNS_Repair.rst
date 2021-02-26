@@ -175,4 +175,85 @@ The situation where there is a client-originated IO against layouts being recons
 
 - non-repair reconstructions like migration or replication.
 
+It is assumed that all state machines are endowed with a common set of features that won't be specifically mentioned:
+
+- integration with ADDB 1[u.machine.addb]. State transitions and distribution of times spent in particular states are logged to the ADDB;
+
+- persistency 2[u.machine.persistency]. State machines use services of local and distributed transaction managers to recover from node failures. After a restart, persistent state machine receives a restart event, that it can use to recover its lost volatile state;
+
+- discoverability 3[u.machine.discoverability]. State machines can be discovered by the management tool;
+
+- queuing 4[u.machine.queuing]. A state machine has a queue of incoming requests.
+
+Copy machine initialization
+===============================
+
+A copy machine parameters are:
+
+- an input set description. An input set consists of data and meta-data that the copy machine has to re-structure. Examples of input set description are:
+
+  - data in a given container;
+
+  - data in all cluster-wide objects, having a component in a given container;
+
+  - data on a given storage device;
+
+  - data in all cluster-wide objects, having a component in a container on a given storage device;
+
+  - data on a given data server;
+
+  - data in all cluster-wide objects, having a component in a container residing on a given data server;
+
+  - data in a client or proxy volatile or persistent cache;
+
+  - data from the operation records in a given segment of FOL;
+
+  - data from all files in a given file-set.
+
+Examples above are for data input sets specifying sources of data reconstruction process. Similarly, meta-data reconstruction uses copy machine operating on a meta-data input set. Meta-data input set describes a collection of meta-data in one or more meta-data containers:
+
+- a collection of meta-data records in a certain meta-data table;
+
+- a collection of meta-data records stored on a certain storage device;
+
+- a collection of meta-data records pertaining to operations on objects in a given file-set;
+
+- a collection of meta-data records in a certain segment of FOL, etc.
+
+Present specification deals mostly with data reconstruction.
+
+It is possible, for a given input set description, to efficiently estimate at what storage devices and at what servers the data from the set are located at the moment. A copy machine uses this information to start agents. The estimation must be conservative: it must include all the servers and devices where data from the set are, but may also include some other servers and devices. The assumption here is that estimation can be made simpler and cheaper at the expense of creating extra agents that will do nothing. The "at the moment" qualification of estimation is for the possibility of container migration. There are multiple possible strategies to deal with the latter:
+
+- "lock" the container as part of estimation, so that migration is not possible while a copy machine uses the container;
+
+- implement container migration as a 2-phase protocol 5 [u.container.migration.vote] where container users (in this case a copy machine) are first asked a permission to move a container;
+
+- implement agents as part of container, migrated together with the later. When migration of a container completes, all its agents get migration event 6 [u.container.migration.call-back]. This is basically the same solution as the previous one, but implemented as part of a container framework.
+
+In the case where a container is migrated by physically moving a storage device around, migration cannot be prevented and any solution of migration problem must deal with this (possibly by failing the copy machine). It is easy to see that an input set description is, essentially, a layout [4] of some kind. Its difference from a more typical file layout is that a file layout domain is a linear file offset name-space, whereas input set layout domain can be more complex: it addresses contents of multiple objects and also their redundancy information.
+
+Input set specifies how data can be found in a certain container or a set of containers. In a typical case of SNS repair, input set specifies how data can be found in the device container (i.e., on a storage device). Other possibilities include input set referring to data containers or objects. These cases capture the cases where input data are compressed, encrypted or de-duplicated;
+
+- priority assignment. A priority is assigned to every container in the input set, determining the order of restructuring;
+
+- an output set description. Similarly to the input set description, an output set description indicates where re-structured data will be stored at. Examples of output set descriptions are:
+
+  - a container;
+
+  - a distributed spare space of a pool;
+
+  - a file or file-set;
+
+All the notes about input set descriptions apply to the output set descriptions.
+
+- an aggregation function. An aggregation function maps input set description layout onto output set description layout domain. Examples of possible aggregation functions are:
+
+  - identity function (for replication, migration, backup);
+
+  - map striping units of a striping group in the input set layout to a striping unit in the output set layout (for repair);
+
+  - map a byte extent of a file in a client data cache onto an equally sized extent in one of the file's component objects;
+
+  - function mapping a block of input set data to its hash (de-duplication).
+
 
