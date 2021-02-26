@@ -556,7 +556,7 @@ Dependencies
 
   - [r.quorum.read]: read access to quorum decisions is needed;
   
- ***************
+***************
 Security Model
 ***************
 
