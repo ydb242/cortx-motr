@@ -255,5 +255,78 @@ All the notes about input set descriptions apply to the output set descriptions.
   - map a byte extent of a file in a client data cache onto an equally sized extent in one of the file's component objects;
 
   - function mapping a block of input set data to its hash (de-duplication).
+  
+  Aggregation function specifies which parts of input set have to be accumulated before output data can be produced. Hence, aggregation function defines the restructuring data-flow and graph of agent-to-agent connections. A set of input parts that aggregation function maps to the same place in the output set is called an aggregation group. For example, striping units of the same parity group form aggregation group for repair, all blocks sharing the same de-duplication hash value form aggregation group for de-duplication;
+
+- a transformation function. A transformation function changes aggregated data or meta-data before they are placed into output set. Examples of possible transformation functions are:
+
+  - identity function (for replication, migration, backup);
+
+  - XOR or higher Reed-Solomon codes for N+K striping layout repair;
+
+  - compression or encryption algorithm.
+
+Transformation function produces output data from a collection of all input data that aggregate function accumulates at a given point of output set layout domain. All transformations that we consider can be calculated by applying some function to each new portion of input set as it arrives, that is, it is never necessary to buffer all aggregated input data before calculating output.
+
+An important optimisation is an opportunistic aggregation and transformation of data. For example, when a parity group having multiple units on the same server is reconstructed, XOR of these units can be calculated by the collecting agent on the server, without sending individual units over the network.
+
+- resource consumption thresholds:
+
+  - memory;
+
+  - processor cycles;
+
+  - storage bandwidth;
+
+  - network bandwidth;
+
+Resource thresholds can be adjusted dynamically.
+
+- a set of call-backs that copy machine calls at certain conditions:
+
+  - progress notifications:
+
+  - enter: called when the copy machine starts re-structuring a part of its input set;
+
+  - leave: called when the copy machine has completed re-structuring a part of its input set.
+
+   A copy machine invokes notification call-backs at different granularities: when it starts or stops processing
+
+  - the whole input set;
+
+  - on a server;
+
+  - on a storage device;
+
+  - in a container;
+
+  - a layout;
+
+  - an aggregation group.
+
+Copy machine operation
+=======================
+
+To describe the operation of a copy machine, the following definitions are convenient:
+
+- copy packet: a chunk of input data traversing through the copy machine. A copy packet is created by a storage-in agent or a collecting agent and encapsulates information necessary to route the data through the machine's agents;
+
+- next-agent(packet, agent): a function returning for a copy packet identity of the agent that has to process this packet next after the given agent. next-agent function determines the routing of copy packets through the copy machine. next-agent function is determined by the aggregation function; 
+
+- aggregation-group(P) is an aggregation group to which packet P belongs;
+
+- queue(P, A) is a function adding copy packet P to the incoming queue of next-agent(P, A), assuming that this queue is local, i.e., that A and next-agent(P, A) are located on the same node.
+
+Persistent state
+--------------------
+
+A copy machine persistent state records processed parts of input set. In a typical case where input set description is defined as a meta-data iterator 7 [u.md.iterator] of some kind (like it is in all the examples given above), persistent copy machine state consists of extents in the iterator position space 8 [u.md.iterator.position]. Multiple disjoint processed extents can appear in input set because of the out-of-order processing of user IO requests. A natural persistent state structure is a B-tree of such extents 9 [u.TREE.SCHEMA.ADD] ST, keyed by starting position of an extent, with merge on insertion and split on deletion done as part of transaction undo. Note: or maybe without merging to avoid the complications of undo action failing. End note.
+
+Each storage device, participating in data restructuring, holds its own copy of copy machine persistent state. This provides a natural level of copy machine fault tolerance, assuring that restructuring can proceed as long as data to restructure are available.
+
+Resource management
+----------------------
+
+A copy machine deals with distributed resource consumption problem. For example, limitations on a fraction of storage device throughput that the copy machine can consume constrain the rate at which copy packets can be sent to the node. Such constraints are addressed by the generic M0 resource management infrastructure 10 [u.resource.generic]. Server nodes declare 11 [u.resource.declare] resources (memory, disk bandwidth, processor bandwidth) allocated for the particular copy machine instance. Other nodes grab 12 [u.resource.grab] portions of declared resources and cache 13 [u.RESOURCE.CACHEABLE] ST resources to submit copy packets.
 
 
