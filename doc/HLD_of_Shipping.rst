@@ -111,3 +111,35 @@ Confidentiality
 ****************
 
 The application code may access only the data relevant to the computation to be performed, namely the inputs provided by the application, either directly or indirectly, via the files that the offloaded function is intended to process. 
+
+*****************
+Integrity
+*****************
+
+The application code may not corrupt or otherwise modify the state of the node, except to the extent of reporting results. (Harmless side effects such as writing to debugging logs are of course allowed, to the extent that they do not otherwise compromise availability or confidentiality.) 
+
+**************
+Availability 
+**************
+
+Running the application code may only use up a reasonable amount of resources of the node, so that it continues to be available for other operations during the run of the offloaded function. Consequently, system policies may throttle the resource consumption of offloaded functions. The policies supported will be the same as those supported in general by Motr services. 
+
+The security requirements cannot be fulfilled by solely relying on a time-consuming review process of application code by the storage cluster administration.  
+
+The rationale is that some applications will require a short code-deploy-execute cycle. For example, when developing a new application, the programmer will typically repeat the following cycle of operations at short intervals: 
+
+#. Write (or modify) a computation to offload 
+
+#. Deploy the function on the storage cluster 
+
+#. Run the application and realise it has problems which require to repeat the cycle. 
+
+In such a scenario, the time to deploy a new function should be in the order of minutes (at most), while the code-review process may take of the order of days.
+
+**********************
+Resource release 
+**********************
+
+The run-time of the offloaded function may span indefinitely after the request is completed. That is, under normal conditions if the user cancels their request, all the currently running offloaded functions related to the request should be terminated and the corresponding resources freed. There may be an acceptable delay between the time of termination of the request and the completion of the termination. This delay corresponds to the amount of time necessary to propagate the termination message and run the necessary operations on each server. [TODO: what should be a reasonable (distribution) bound for this time?]. (This feature is particularly useful when a user mistakenly offloaded an extremely resource-hungry computation.) 
+
+
