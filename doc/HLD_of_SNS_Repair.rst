@@ -329,4 +329,23 @@ Resource management
 
 A copy machine deals with distributed resource consumption problem. For example, limitations on a fraction of storage device throughput that the copy machine can consume constrain the rate at which copy packets can be sent to the node. Such constraints are addressed by the generic M0 resource management infrastructure 10 [u.resource.generic]. Server nodes declare 11 [u.resource.declare] resources (memory, disk bandwidth, processor bandwidth) allocated for the particular copy machine instance. Other nodes grab 12 [u.resource.grab] portions of declared resources and cache 13 [u.RESOURCE.CACHEABLE] ST resources to submit copy packets.
 
+Transactions
+----------------
+
+Restructuring of an aggregation group must be a distributed transaction. To achieve this, a copy packet P is tagged with a distributed transaction identifier which is a function of aggregation-group(P), so that all packets of the same group have the same transaction identifiers 14 [u.dtm.tid.generate]. Every agent processing the packet, places transaction record in FOL 15 [u.fol.record.custom] as usual part of transaction processing. In a typical scenario, where packet pipe-line contains only a single storage-out agent, redo-only transactions can be used.
+
+FOL records of packet processing are pruned from the FOL as usual. On the undo phase of recovery, FOL is replayed and each node undoes local part of copy packet processing. On the redo recovery, an agent redoes packet processing, including forwarding the packet to other nodes, if versions match.
+
+Copy machine call-backs are executed as part of the same transaction as the rest of packet processing.
+
+- "component level locking" is achieved by taking lock on an extent of object data on the same server where these data are located; 
+
+- time-stamp based optimistic concurrency control 
+
+Independently of whether a cluster-wide object level locking model 16 [u.dlm.logical-locking], where data are protected by locks taken on cluster-wide object (these can be either extent locks taken in cluster-wide object byte offset name-space 17 [u.IO.EXTENT-LOCKING] ST or "whole-file" locks 18 [u.IO.MD-LOCKING] ST, or component level locking model, or time-stamping model is used, locks or time-stamps are served by a potentially replicated locking service running on a set of lock servers (a set that might be equal to the set of servers in the pool). The standard locking protocol as used by the file system clients would imply that all locks or time-stamps necessary for an aggregation group processing must be acquired before any processing can be done. This implies a high degree of synchronization between agents processing copy packets from the same aggregation group.
+
+Fortunately, this ordering requirement can be weakened by making every agent to take (the same) required lock and assuming that lock manager recognizes, by comparing transaction identifiers, that lock requests from different agents are part of the same transaction and, hence, are not in conflict 19 [u.dlm.transaction-based].
+
+
+
 
