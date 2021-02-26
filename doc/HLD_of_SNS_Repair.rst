@@ -346,6 +346,216 @@ Independently of whether a cluster-wide object level locking model 16 [u.dlm.log
 
 Fortunately, this ordering requirement can be weakened by making every agent to take (the same) required lock and assuming that lock manager recognizes, by comparing transaction identifiers, that lock requests from different agents are part of the same transaction and, hence, are not in conflict 19 [u.dlm.transaction-based].
 
+Pool Machine
+--------------
+
+Pool machine is a replicated state machine [5], having replicas on all pool nodes. Each replica maintains the following state:
+
+node : array of struct { id : node identity,
+
+state : enum state };
+
+device : array of struct { id : device identity,
+
+state : enum state };
+
+read-version : integer;
+
+write-version : integer;
+
+where state is enum { ONLINE, FAILED, OFFLINE, RECOVERING }. It is assumed that there is a function device-node() mapping device identity to the index in node[] corresponding to the node the device is currently attached to. The elements of the device[] array corresponding to devices attached to non-ONLINE nodes are effectively undefined (state transition function does not depend on them). To avoid mentioning this condition in the following, it is assumed that
+
+device-node(device[i].id).state == ONLINE,
+
+for any index i in device[] array, that is, devices attached to non-ONLINE nodes are excised from the state.
+
+State transitions of a pool machine happen when the state is changed on a quorum 37 [u.quorum.consensus] of replicas. To describe state transitions the following derived state (that is not necessary actually stored on replicas) is introduced:
+
+nr-nodes : number of elements in node[] array
+
+nr-devices : number of elements in device[] array
+
+nodes-in-state[S] : number of elements in node[] array with the state field equal to S
+
+devices-in-state[S] : number of elements in device[] array with the state field equal to S
+
+nodes-missing = nr-nodes - nodes-in-state[ONLINE]
+
+devices-missing = nr-devices - devices-in-state[ONLINE]
+
+In addition to the state described above, a pool is equipped with a "constant" (in the sense that its modifications are beyond the scope of the present design specification) configuration state including:
+
+- max-node-failures : integer, a number of node failures that the pool tolerates;
+
+- max-device-failures : integer, a number of storage device failures that the pool tolerates.
+
+A pool is said to be a dud (Data possibly Unavailable or Damaged) when more device and node failed in it than the pool is configured to tolerate.
+
+A pool state with nodes-missing = n and devices-missing = k is said to belong to a state class S(n, k), for example, any normal state belongs to the class S(0,0).
+
+As part of changing its state, a pool machine interacts with external entities such as layout manager or client caches. During this interaction multiple failures, delays and concurrent pool machine state transitions might happen. In general it is impossible to guarantee that all external state will be updated by the time the pool machine reaches its target state. To deal with this, pool state contains a version vector, some components of which are increased on any state transition. All external requests to the pool (specifically, IO requests) are tagged with the version vector of the pool state the request issuer knows about. The pool rejects requests with incompatibly stale versions, forcing issuer to re-new its knowledge of the pool state. Separate read and write versions are used to avoid unnecessary rejections. E.g., read requests are not invalidated by adding a new device or a new server to the pool.
+
+Server state machine
+=======================
+
+Persistent server state consists of its copy of the pool state.
+
+On boot a server contacts a quorum of pool servers (counting itself) and updates its copy of the pool state. If recovery is necessary (unclean shutdown, server state as returned by the quorum is not OFFLINE), the server changes the pool state (through the quorum) to register that it is recovering. After the recovery of distributed transactions completes, the server changes the pool state to indicate that the server is now in ONLINE state (which must have been the server's pre-recovery state). See details in the State section.
+
+Scalable IO
+
+As described in the Logical specification, at the heart of SNS repair design is a copy machine: a mechanism for scalable data re-structuring. The same copy machine code can be used for variety of purposes, some described in certain detail in this document. One particularly important use of copy machine outside of SNS repair proper is a "normal" client IO.
+
+In the simplest case, a client performs a non-cached write operation on a file. A very simple copy machine consisting of a single user-in agent reading data from the user space, a network-out agent sending data to the servers and a network-in and storage-out agents on the servers can be used. The input set description in this case consists of a single buffer in the user application address space or iovec vector describing a collection of such buffers. Output set description is similarly given by a extent or a vector of extents in the file layout. An obvious generalisation of this is a copy machine with multiple user-in agents copying segments of an input buffer in parallel. This design can utilise throughput of multiple processor cores at the expense of weakening POSIX failure semantics. The same applies for file read, with user-out agent(s) copying data to the user space.
+
+Similar copy machines can be employed for cached IO, except that input set description is done in terms of local file layout (based on page cache indexing).
+
+An alternative construction of a copy machine for cached IO is one with an input set description made directly in terms of cached data pages. This copy machine would be able to form copy packets containing data from multiple objects and multiple files. To unify this model with earlier described layout based input set descriptions, a client allocates a number of local containers and populates them with cached data. A copy machine sends out parts of these containers. With this approach, multi-object cached IO and container migration become instances of the same generic data re-structuring process, sharing the copy machine infrastructure.
+
+An important advantage of copy machine based IO is a flexibility in data routing. The description of SNS repair above mentioned the possibility of partial aggregation of data on intermediate servers. In the case of client IO, the same mechanism makes it possible to route data through proxy nodes, including proxy servers and peer-to-peer clients. For example, an owning client can be selected for every parity group in a file with IO requests to this group being routed through this client. In addition to utilising client to client network bandwidth, this allows makes client to server operations more efficient because they would more likely be full-stripe ones.
+
+**************
+Conformance
+**************
+
+- [i.sns.repair.triggers] A pool machine registers with health layer its interest in hearing about device, node and network failures. When health layer notifies the pool machine about a failure, state transition happens44 and repair, if necessary, is triggered.
+
+- [i.sns.repair.code-reuse] Local RAID repair is a special case of general repair. When a storage device fails in a way that requires only local repair, the pool machine records this failure as in general case and creates a copy engine to handle the repair. All agents of this machine are operating on the same node.
+
+- [i.sns.repair.layout-update] When a pool state machine enters a non-normal state, it changes its version numbers. Clients attempting to do IO on layouts tagged with old version numbers, would have to re-fetch the pool state. Optionally, requests layout manager to proactively revoke all layouts intersecting with the failed device or node. Optionally, use copy machine "enter layout" progress call-back to revoke a particular layout. As part of re-fetching layouts, clients learn updated list of alive nodes and devices. This list is a parameter to layout. The layout IO engine uses this parameter to do IO in degraded mode47.
+
+- [i.sns.repair.client-io] Client IO continues as repair is going on. This is achieved by re-directing clients to degraded layouts, so that clients collaborate with the copy machine in repair. After copy machine notifies pool machine of processing progress (through the "leave" progress call-back), repaired parts of layout48 are upgraded; 
+
+- [i.sns.repair.priority] Containers can be assigned a repair priority specifying in what order they are to be repaired. Prioritization is part of the storage-in agent logic.
+
+- [i.sns.repair.degraded] Pool state machine is in degraded mode during repair: described in the pool machine logical specification. Individual layouts are moved out of degraded mode as they are reconstructed: when copy machine is done with all components of a layout, it signals layout manager that layout can be upgraded (either lazily or by revoking all degraded layouts).
+
+- [i.sns.repair.c4]
+
+   - Repair is controllable by advanced C4 settings: can be paused, its IO priority can be changed. This is guaranteed by dynamically adjustable copy machine resource consumption thresholds. 
+
+   - Repair reports its progress to C4. This is guaranteed by the standard state machine functionality. 
+
+- [i.sns.repair.addb] Repair should produce ADDB records of its actions: this is a part of standard state machine functionality.
+
+- [i.sns.repair.device-oriented] Repair uses device-oriented repair algorithm, as described in On-line Data reconstruction in Redundant Disk Arrays dissertation: this follows from the storage-in agent processing logic.
+
+- [i.sns.repair.failure.transient] Repair survives transient node and network failures. After failed node restarts or network partitions heals, distributed transactions, including repair transactions created by copy machine are redone or undone to restore consistency. Due to the construction of repair transactions, recovery also restores repair to a consistent state, from which it can resume.
+
+- [i.sns.repair.failure.permanent] Repair handles permanent failures gracefully. Repair updates file layouts with at the transaction boundary. Together with copy machine state replication, described in the Persistent state sub-section, this guarantees that repair can continue in the face of multiple failures.
+
+- [i.sns.repair.used-only] Repair should not reconstruct unused (free) parts of failed storage: this is a property of a container based repair design.
+
+********************
+Dependencies
+********************
+
+- layouts
+
+  - [r.layout.intersects]: it must be possible to efficiently find all layouts intersecting with a given server or a given storage device;
+
+  - [r.layout.parameter.dead]: a list of failed servers and devices is a parameter to a layout formula;
+
+  - [r.layout.degraded-mode]: layout IO engine does degraded mode IO if directed to do so by the layout parameters;
+
+  - [r.layout.lazy-invalidation]: layout can be invalidated lazily, on a next IO request;
+
+- DTM
+
+  - [r.fol.record.custom] : custom FOL record type, with user defined redo and undo actions can be defined;
+
+  - [r.dtm.intercept]: it is possible to execute additional actions in the context of a user-level transaction;
+
+  - [r.dtm.tid.generate]: transaction identifiers can be assigned by DTM users;
+
+- management tool
+
+- RPC
+
+  - [r.rpc.maximal.bulk-size]
+
+  - [r.network.utilization]: an interface to estimate network utilization;
+
+  - [r.rpc.pluggable]: it is possible to register a call-back to be called by the RPC layer to process a particular RPC type;
+
+  - health and liveness layer:
+
+  - [r.health.interest], [r.health.node], [r.health.device], [r.health.network] it is possible to register interest in certain failure event types (network, node, storage device) for certain system components (e.g., all nodes in a pool);
+
+  - [r.health.call-back] liveness layer invokes a call-back when an event on interest happens;
+
+  - [r.health.fault-tolerance] liveness layer is fault-tolerant. Call-back invocation is carried through the node and network failures;
+
+  - [r.rpc.streaming.bandwidth]: optimally streamed RPCs can utilize at least 95% of raw network bandwidth;
+
+  - [r.rpc.async]: there is an asynchronous RPC sending interface;
+
+- DLM
+
+  - [r.dlm.enqueue.async]: a lock can be enqueued asynchronously;
+
+  - [r.dlm.logical-locking]: locks are taken on cluster-wide objects;
+
+  - [r.dlm.transaction-based]: lock requests issued on behalf of transactions. Lock requests made on behalf of the same transaction are never in conflict;
+
+- meta-data:
+
+  - [u.md.iterator]: generic meta-data iterators, suitable for input set description;
+
+  - [u.md.iterator.position]: meta-data iterators come with a totally ordered space of possible iteration positions;
+
+- state machines:
+
+  - [r.machine.addb]: state machines report statistics about their state transitions to ADDB;
+
+  - [r.machine.persistence]: state machine can be made persistent and recoverable. Local transaction manager invokes restart event on persistent state machines after node reboots;
+
+  - [r.machine.discoverability]: state machines can be discovered by c4;
+
+  - [r.machine.queuing]: a state machine has a queue of incoming requests;
+
+- containers:
+
+  - [r.container.enumerate]: it is possible to efficiently iterate through the containers stored (at the moment) on a given storage device;
+
+  - [r.container.migration.call-back]: a container notifies interested parties in its migration events;
+
+  - [r.container.migration.vote]: container migration, if possible, includes a voting phase, giving interested parties an opportunity to prepare for the future migration;
+
+  - [r.container.offset-order]: container offset order matches underlying storage device block ordering enough to make container offset ordered transfers optimal;
+
+  - [r.container.read-ahead]: container do read-ahead;
+
+  - [r.container.streaming.bandwidth]: large-chunk streaming container IO can utilize at least 95% of raw storage device throughput;
+
+  - [r.container.async]: there is an asynchronous container IO interface;
+
+- storage:
+
+  - [r.storage.utilization]: an interface to measure a utilization a given device for a certain time period;
+
+  - [r.storage.transfer-size]: an interface to determine maximal efficient request size of a given storage device;
+
+  - [r.storage.intercept]: it should be possible to intercept IO requests targeting a given storage device;
+
+- SNS:
+
+  - [r.sns.trusted-client] (constraint): only trusted clients can operate on SNS objects;
+
+- miscellaneous:
+
+  - [r.processor.utilization]: an interface to measure processor utilization for a certain time period;
+
+- resource management:
+
+  - [r.resource.generic]: resource management infrastructure is generic enough to implement copy machine resource limits;
+
+- quorum:
+
+  - [r.quorum.consensus]: quorum based consensus mechanism is needed;
+
+  - [r.quorum.read]: read access to quorum decisions is needed; 
+
 
 
 
