@@ -188,7 +188,8 @@ enum m0_be_dtm0_log_credit_op {
 	M0_DTML_SENT,
 	M0_DTML_EXECUTED,
 	M0_DTML_PERSISTENT,
-	M0_DTML_REDO
+	M0_DTML_REDO,
+	M0_DTML_PRUNE
 };
 
 struct m0_dtm0_log_rec {
@@ -220,6 +221,7 @@ M0_INTERNAL void m0_be_dtm0_log_credit(enum m0_be_dtm0_log_credit_op op,
                                        struct m0_be_dtm0_log        *log,
                                        struct m0_be_tx              *tx,
                                        struct m0_be_seg             *seg,
+                                       const struct m0_dtm0_tid      *id,
                                        struct m0_be_tx_credit       *accum,
                                        uint32_t                      nr_pa,
                                        uint64_t                      size);

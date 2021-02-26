@@ -110,10 +110,35 @@ M0_INTERNAL void m0_be_dtm0_log_fini(struct m0_be_dtm0_log **log)
 	}
 }
 
+static void m0_be_dtm0_log_credit__prune(struct m0_be_dtm0_log    *log,
+                                         const struct m0_dtm0_tid *id,
+                                         struct m0_be_tx_credit   *accum)
+{
+	/* This assignment is meaningful as it covers the empty log case */
+	int                     rc = M0_DTS_LT;
+	struct m0_be_tx_credit  cred = {};
+	struct m0_dtm0_log_rec *rec;
+
+	m0_be_list_for (plrec, log->dl_list, rec) {
+		plrec_be_list_credit(M0_BLO_TLINK_DESTROY, 1, &cred);
+		plrec_be_list_credit(M0_BLO_DEL, 1, &cred);
+
+		rc = m0_dtm0_tid_cmp(log->dl_cs, &rec->dlr_txd.dtd_id,
+                                     id);
+
+		if (rc == M0_DTS_EQ)
+			break;
+	} m0_be_list_endfor;
+
+	if (rc == M0_DTS_EQ)
+		m0_be_tx_credit_add(accum, &cred);
+}
+
 M0_INTERNAL void m0_be_dtm0_log_credit(enum m0_be_dtm0_log_credit_op op,
                                        struct m0_be_dtm0_log        *log,
                                        struct m0_be_tx              *tx,
                                        struct m0_be_seg             *seg,
+                                       const struct m0_dtm0_tid      *id,
                                        struct m0_be_tx_credit       *accum,
                                        uint32_t                      nr_pa,
                                        uint64_t                      size)
@@ -151,6 +176,9 @@ M0_INTERNAL void m0_be_dtm0_log_credit(enum m0_be_dtm0_log_credit_op op,
 		m0_be_tx_credit_add(accum, &cred_lrec);
 		m0_be_tx_credit_add(accum, &cred_pa);
 		m0_be_tx_credit_add(accum, &cred_buf);
+		break;
+	case M0_DTML_PRUNE:
+		m0_be_dtm0_log_credit__prune(log, id, accum);
 		break;
 	default:
 		M0_IMPOSSIBLE("");
@@ -483,7 +511,6 @@ static int m0_be_dtm0_log_prune__plist(struct m0_be_dtm0_log    *log,
 	int                     rc = M0_DTS_LT;
 	struct m0_dtm0_log_rec *rec;
 	struct m0_dtm0_log_rec *currec;
-	struct m0_be_tx_credit cred = {};
 
 	m0_be_list_for (plrec, log->dl_list, rec) {
 		if (!m0_dtm0_is_rec_is_stable(&rec->dlr_txd.dtd_pg))
@@ -492,9 +519,6 @@ static int m0_be_dtm0_log_prune__plist(struct m0_be_dtm0_log    *log,
 		rc = m0_dtm0_tid_cmp(log->dl_cs, &rec->dlr_txd.dtd_id,
                                      id);
 
-		plrec_be_list_credit(M0_BLO_TLINK_DESTROY, 1, &cred);
-		plrec_be_list_credit(M0_BLO_DEL, 1, &cred);
-
 		if (rc != M0_DTS_LT)
 			break;
 	} m0_be_list_endfor;
@@ -502,8 +526,6 @@ static int m0_be_dtm0_log_prune__plist(struct m0_be_dtm0_log    *log,
 	if (rc != M0_DTS_EQ)
 		return M0_ERR(-ENOENT);
 
-	/* TODO: Prepare transaction */
-	/* TODO: Open Transaction */
 	while ((currec = plrec_be_list_head(log->dl_list))) {
 		if (currec != rec) {
 			plrec_be_list_del(log->dl_list, tx, currec);
@@ -516,7 +538,6 @@ static int m0_be_dtm0_log_prune__plist(struct m0_be_dtm0_log    *log,
 	plrec_be_list_del(log->dl_list, tx, rec);
 	plrec_be_tlink_destroy(rec, tx);
 	m0_be_dtm0_log_rec_fini(log, tx, seg, &rec);
-	/* TODO: Close transaction */
 	return 0;
 }
 
