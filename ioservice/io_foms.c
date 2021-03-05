@@ -2050,6 +2050,7 @@ static int stob_io_create(struct m0_fom *fom)
 		m0_stob_io_init(stio);
 		if (fom_obj->fcrw_flags & M0_IO_FLAG_NOHOLE)
 			stio->si_flags |= SIF_NOHOLE;
+		stio->si_flags |= SIF_NODEV;
 		stio->si_fol_frag = &siod->siod_fol_frag;
 
 		todo = rwfop->crw_desc.id_descs[i].bdd_used >>

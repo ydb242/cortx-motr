@@ -242,11 +242,14 @@ static int stob_linux_domain_init(struct m0_stob_type *type,
 	if (ldom != NULL)
 		ldom->sld_cfg = *(struct m0_stob_linux_domain_cfg *)cfg_init;
 	path = m0_strdup(location_data);
+	ldom->sld_zero = open( "/dev/zero", O_RDONLY);
+	ldom->sld_null = open( "/dev/null", O_RDWR);
 	rc = ldom == NULL || path == NULL ? -ENOMEM : 0;
 
 	rc = rc ?: stob_linux_domain_key_get_set(path, &dom_key, true);
 	rc = rc ?: m0_stob_domain__dom_key_is_valid(dom_key) ? 0 : -EINVAL;
 	rc = rc ?: m0_stob_ioq_init(&ldom->sld_ioq);
+	M0_ASSERT(ldom->sld_zero > 0 || ldom->sld_null > 0);
 	if (rc == 0) {
 		m0_stob_ioq_directio_setup(&ldom->sld_ioq,
 					   ldom->sld_cfg.sldc_use_directio);

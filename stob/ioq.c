@@ -20,6 +20,7 @@
 
 
 #include "stob/ioq.h"
+#include <fcntl.h>       /* open */
 
 #define M0_TRACE_SUBSYSTEM M0_TRACE_SUBSYS_STOB
 #include "lib/trace.h"
@@ -271,7 +272,14 @@ static int stob_linux_io_launch(struct m0_stob_io *io)
 		m0_queue_link_init(&qev->iq_linkage);
 
 		iocb->u.v.vec = iov;
-		iocb->aio_fildes = lstob->sl_fd;
+		if (io->si_flags & SIF_NODEV) {
+			iocb->aio_fildes = io->si_opcode == SIO_READ
+			? lstob->sl_dom->sld_zero
+			: lstob->sl_dom->sld_null;
+			M0_ASSERT(iocb->aio_fildes > 0);
+		} else {
+			iocb->aio_fildes = lstob->sl_fd;
+		}
 		iocb->u.v.nr = min32u(frags, IOV_MAX);
 		iocb->u.v.offset = off << m0_stob_ioq_bshift(ioq);
 		iocb->aio_lio_opcode = opcode;

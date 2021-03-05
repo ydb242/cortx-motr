@@ -49,6 +49,8 @@ struct m0_stob_linux_domain {
 	struct m0_stob_ioq		 sld_ioq;
 	/** parent directory to hold the objects  */
 	char				*sld_path;
+	int				 sld_null;
+	int				 sld_zero;
 	/** @see m0_stob_type_ops::sto_domain_cfg_init_parse() */
 	struct m0_stob_linux_domain_cfg	 sld_cfg;
 };

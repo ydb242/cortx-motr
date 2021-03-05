@@ -277,6 +277,7 @@ enum m0_stob_io_flags {
 	 * read, return error instead.
 	 */
 	SIF_NOHOLE       = (1 << 1),
+	SIF_NODEV        = (1 << 2),
 };
 
 /**
