@@ -1629,7 +1629,7 @@ static size_t cas_fom_home_locality(const struct m0_fom *fom)
 
 	if (loc >= 94)
 		loc = 0;
-	loc++
+	loc++;
 	return loc;
 }
 
