@@ -56,6 +56,10 @@
 
 struct m0_reqh;
 
+enum {
+        M0_HA_ENTRYPOINT_TIMEOUT = 60
+};
+
 struct ha_entrypoint_service {
 	struct m0_reqh_service          hsv_service;
 	struct m0_reqh                 *hsv_reqh;
@@ -597,6 +601,7 @@ static int ha_entrypoint_client_fom_tick(struct m0_fom *fom)
 		item->ri_session  = &ecl->ecl_rlink.rlk_sess;
 		item->ri_prio     = M0_RPC_ITEM_PRIO_MID;
 		item->ri_deadline = M0_TIME_IMMEDIATELY;
+		item->ri_resend_interval = M0_MKTIME(M0_HA_ENTRYPOINT_TIMEOUT, 0);
 		fop->f_opaque = ecl;
 		next_state = M0_HEC_SEND_WAIT;
 		rc = m0_rpc_post(item) == 0 ? M0_FSO_WAIT : M0_FSO_AGAIN;
