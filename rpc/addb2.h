@@ -50,6 +50,7 @@ enum m0_avi_rpc_labels {
         M0_AVI_RPC_BULK_ATTR_BUF_NR,
         M0_AVI_RPC_BULK_ATTR_BYTES,
         M0_AVI_RPC_BULK_ATTR_SEG_NR,
+	M0_AVI_RPC_POST_REPLY_STATE,
 } M0_XCA_ENUM;
 
 /** @} end of rpc group */

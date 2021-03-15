@@ -468,7 +468,7 @@ static int fom_queue_reply(struct m0_fom *fom)
 			m0_fop_to_rpc_item(fom->fo_fop),
 			m0_fop_to_rpc_item(fom->fo_fop)->ri_type->rit_opcode,
 			m0_fop_to_rpc_item(fom->fo_rep_fop),
-			m0_fop_to_rpc_item(fom->fo_rep_fop)->ri_error);
+		        m0_fop_to_rpc_item(fom->fo_rep_fop)->ri_error);
 
 		m0_rpc_reply_post(m0_fop_to_rpc_item(fom->fo_fop),
 				  m0_fop_to_rpc_item(fom->fo_rep_fop));

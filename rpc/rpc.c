@@ -33,6 +33,7 @@
 #include "rpc/rpc.h"
 #include "rpc/rpc_internal.h"
 #include "rpc/service.h"
+#include "rpc/addb2.h"
 
 /**
  * @addtogroup rpc
@@ -132,11 +133,24 @@ M0_INTERNAL int m0_rpc__post_locked(struct m0_rpc_item *item)
 	return error;
 }
 
+static void rpc_reply_post_addb(struct m0_rpc_item *req, uint64_t state)
+{
+	uint64_t item_sm_id = 0;
+
+	if (req != NULL && req->ri_session != NULL) {
+		item_sm_id = m0_sm_id_get(&req->ri_sm);
+		M0_ADDB2_ADD(M0_AVI_RPC_POST_REPLY_STATE, item_sm_id, state);
+	}
+}
+
 void m0_rpc_reply_post(struct m0_rpc_item *request, struct m0_rpc_item *reply)
 {
 	struct m0_rpc_machine *machine;
 
 	M0_ENTRY("req_item: %p, rep_item: %p", request, reply);
+
+	rpc_reply_post_addb(request, 0);
+	
 	M0_PRE(request != NULL && reply != NULL);
 	M0_PRE(request->ri_session != NULL);
 	M0_PRE(reply->ri_type != NULL);
@@ -150,19 +164,26 @@ void m0_rpc_reply_post(struct m0_rpc_item *request, struct m0_rpc_item *reply)
 				     200 * 1000 * 1000), NULL);
 	}
 
+	rpc_reply_post_addb(request, 1);
+	
 	reply->ri_resend_interval = M0_TIME_NEVER;
 	reply->ri_rpc_time = m0_time_now();
 	reply->ri_session  = request->ri_session;
 	machine = reply->ri_rmachine = request->ri_rmachine;
-
+	
 	reply->ri_prio     = request->ri_prio;
 	reply->ri_deadline = 0;
 	reply->ri_error    = 0;
 
+	
+	rpc_reply_post_addb(request, 2);
 	m0_rpc_machine_lock(machine);
+	rpc_reply_post_addb(request, 3);
 	m0_rpc_item_sm_init(reply, M0_RPC_ITEM_OUTGOING);
 	m0_rpc_item_send_reply(request, reply);
+	rpc_reply_post_addb(request, 4);
 	m0_rpc_machine_unlock(machine);
+	rpc_reply_post_addb(request, 5);
 }
 M0_EXPORTED(m0_rpc_reply_post);
 
