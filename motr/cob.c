@@ -1851,14 +1851,26 @@ M0_INTERNAL int m0__obj_namei_send(struct m0_op_obj *oo)
 		cr->cr_cob_attr->ca_lid = obj->ob_attr.oa_layout_id;
 	}
 
+	if (cr->cr_opcode != M0_EO_GETATTR) {
 	/* Send requests to services. */
-	rc = cob_req_send(cr);
-	if (rc != 0) {
-		cr->cr_ar.ar_ast.sa_cb = &cob_ast_fail_cr;
-		cr->cr_ar.ar_rc = rc;
-		m0_sm_ast_post(cr->cr_op_sm_grp, &cr->cr_ar.ar_ast);
-	}
+		rc = cob_req_send(cr);
+		if (rc != 0) {
+			cr->cr_ar.ar_ast.sa_cb = &cob_ast_fail_cr;
+			cr->cr_ar.ar_rc = rc;
+			m0_sm_ast_post(cr->cr_op_sm_grp, &cr->cr_ar.ar_ast);
+		}
+	} else {
+		obj = m0__obj_entity(oo->oo_oc.oc_op.op_entity);
+		obj->ob_attr.oa_pver.f_container = pv->pv_id.f_container;
+		obj->ob_attr.oa_pver.f_key = pv->pv_id.f_key;
+		obj->ob_attr.oa_layout_id = M0_DEFAULT_LAYOUT_ID;
 
+		m0_sm_move(&cr->cr_op->op_sm, 0, M0_OS_LAUNCHED);
+		m0_sm_group_unlock(&cr->cr_op->op_sm_group);
+		cob_complete_op(cr->cr_op);
+		m0_sm_group_lock(&cr->cr_op->op_sm_group);
+		rc = 3;
+	}
 	return M0_RC(rc);
 }
 
