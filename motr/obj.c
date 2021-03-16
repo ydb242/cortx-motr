@@ -261,8 +261,16 @@ static void obj_namei_cb_launch(struct m0_op_common *oc)
 	m0_sm_group_unlock(&op->op_entity->en_sm_group);
 
 	rc = m0__obj_namei_send(oo);
-	if (rc == 0)
-		m0_sm_move(&op->op_sm, 0, M0_OS_LAUNCHED);
+	if (rc == 0) {
+		if (op->op_code != M0_EO_GETATTR) {
+			m0_sm_move(&op->op_sm, 0, M0_OS_LAUNCHED);
+		}
+	} else if (rc == 3) {
+		/* Here rc=3 means this is M0_EO_GETATTR and 
+		 * op state is already moved to LAUNCHED -->
+		 * EXECUTED --> STABLE, so skipped mo_sm_move()*/
+		rc = 0;
+	}
 
 	M0_LEAVE();
 }
@@ -567,7 +575,7 @@ static int obj_op_obj_init(struct m0_op_obj *oo)
 	struct m0_locality     *locality;
 	struct m0_pool_version *pv;
 	struct m0_obj          *obj;
-	struct m0_client       *cinst;
+//	struct m0_client       *cinst;
 
 	M0_ENTRY();
 	M0_PRE(oo != NULL);
@@ -577,6 +585,7 @@ static int obj_op_obj_init(struct m0_op_obj *oo)
 
 	/** Get the object's pool version. */
 	obj = m0__obj_entity(oo->oo_oc.oc_op.op_entity);
+#if 0
 	if (OP_OBJ2CODE(oo) == M0_EO_CREATE) {
 		rc = m0__obj_pool_version_get(obj, &pv);
 		if (rc != 0)
@@ -597,6 +606,11 @@ static int obj_op_obj_init(struct m0_op_obj *oo)
 	} else {
 		oo->oo_pver = m0__obj_pver(obj);
 	}
+#endif
+		rc = m0__obj_pool_version_get(obj, &pv);
+		if (rc != 0)
+			return M0_ERR(rc);
+		oo->oo_pver = pv->pv_id;
 	/** TODO: hash the fid to chose a locality */
 	locality = m0__locality_pick(m0__oo_instance(oo));
 	M0_ASSERT(locality != NULL);
@@ -780,7 +794,6 @@ int m0_entity_create(struct m0_fid *pool,
 		obj = M0_AMB(obj, entity, ob_entity);
 		obj->ob_attr.oa_pool = *pool;
 	}
-
 	return M0_RC(entity_namei_op(entity, op, M0_EO_CREATE));
 }
 M0_EXPORTED(m0_entity_create);
