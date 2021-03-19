@@ -964,10 +964,10 @@ static bool cas_key_need_to_send(struct cas_fom *fom, enum m0_cas_opcode opc,
 	return key_send;
 }
 
-static void cas_fom_cleanup(struct cas_fom *fom, bool ctg_op_fini)
+static void cas_fom_cleanup(struct cas_fom *fom, struct m0_cas_op *op, bool ctg_op_fini)
 {
 	struct m0_ctg_op  *ctg_op     = &fom->cf_ctg_op;
-	struct m0_cas_ctg *meta       = m0_ctg_meta();
+	struct m0_cas_ctg *meta       = m0_ctg_meta(&op->cg_id.ci_fid);
 	struct m0_cas_ctg *ctidx      = m0_ctg_ctidx();
 	struct m0_cas_ctg *dead_index = m0_ctg_dead_index();
 
@@ -984,7 +984,7 @@ static void cas_fom_cleanup(struct cas_fom *fom, bool ctg_op_fini)
 	}
 }
 
-static void cas_fom_failure(struct cas_fom *fom, int rc, bool ctg_op_fini)
+static void cas_fom_failure(struct cas_fom *fom, struct m0_cas_op *op, int rc, bool ctg_op_fini)
 {
 	struct m0_cas_rep *repdata;
 	struct m0_cas_rec *repv;
@@ -1007,13 +1007,13 @@ static void cas_fom_failure(struct cas_fom *fom, int rc, bool ctg_op_fini)
 	repdata->cgr_rep.cr_rec = NULL;
 	repdata->cgr_rep.cr_nr  = 0;
 
-	cas_fom_cleanup(fom, ctg_op_fini);
+	cas_fom_cleanup(fom, op, ctg_op_fini);
 	m0_fom_phase_move(&fom->cf_fom, rc, M0_FOPH_FAILURE);
 }
 
-static void cas_fom_success(struct cas_fom *fom, enum m0_cas_opcode opc)
+static void cas_fom_success(struct cas_fom *fom, struct m0_cas_op *op, enum m0_cas_opcode opc)
 {
-	cas_fom_cleanup(fom, opc == CO_CUR);
+	cas_fom_cleanup(fom, op, opc == CO_CUR);
 	m0_fom_phase_set(&fom->cf_fom, M0_FOPH_SUCCESS);
 }
 
@@ -1105,7 +1105,7 @@ static int cas_fom_tick(struct m0_fom *fom0)
 	struct m0_ctg_op   *ctg_op  = &fom->cf_ctg_op;
 	struct cas_service *service = M0_AMB(service,
 					     fom0->fo_service, c_service);
-	struct m0_cas_ctg  *meta    = m0_ctg_meta();
+	struct m0_cas_ctg  *meta    = m0_ctg_meta(&op->cg_id.ci_fid);
 	struct m0_cas_ctg  *ctidx   = m0_ctg_ctidx();
 	struct m0_cas_rec  *rec     = NULL;
 	bool                is_index_drop;
@@ -1134,7 +1134,7 @@ static int cas_fom_tick(struct m0_fom *fom0)
 			 * generic phase. When a failure happens in our phase,
 			 * cas_fom_failure() is called explicitly.
 			 */
-			cas_fom_cleanup(fom, false);
+			cas_fom_cleanup(fom, op, false);
 		}
 		result = m0_fom_tick_generic(fom0);
 		if (m0_fom_phase(fom0) == M0_FOPH_TXN_OPEN) {
@@ -1212,7 +1212,7 @@ static int cas_fom_tick(struct m0_fom *fom0)
 		}
 		m0_ctg_op_fini(ctg_op);
 		if (rc != 0)
-			cas_fom_failure(fom, rc, false);
+			cas_fom_failure(fom, op, rc, false);
 		break;
 	case CAS_CTG_CROW_DONE:
 		/*
@@ -1243,7 +1243,7 @@ static int cas_fom_tick(struct m0_fom *fom0)
 		if (fom->cf_thrall_rc == 0 || fom->cf_thrall_rc == -EEXIST)
 			m0_fom_phase_set(fom0, CAS_START);
 		else
-			cas_fom_failure(fom, fom->cf_thrall_rc, false);
+			cas_fom_failure(fom, op, fom->cf_thrall_rc, false);
 		break;
 	case CAS_LOAD_KEY:
 		result = cas_at_load(&cas_at(op, ipos)->cr_key, fom0,
@@ -1266,7 +1266,7 @@ static int cas_fom_tick(struct m0_fom *fom0)
 			fom->cf_ipos = 0;
 			rc = cas_incoming_kv_setup(fom, op);
 			if (rc != 0)
-				cas_fom_failure(fom, M0_ERR(rc), false);
+				cas_fom_failure(fom, op, M0_ERR(rc), false);
 			else {
 				addb2_add_kv_attrs(fom, STATS_KV_IN);
 				result = cas_kv_load_done(fom, opc, op,
@@ -1309,7 +1309,7 @@ static int cas_fom_tick(struct m0_fom *fom0)
 
 		rc = is_meta ? 0 : cas_op_recs_check(fom, opc, ct, op);
 		if (rc != 0) {
-			cas_fom_failure(fom, M0_ERR(rc), false);
+			cas_fom_failure(fom, op, M0_ERR(rc), false);
 			break;
 		}
 
@@ -1355,10 +1355,10 @@ static int cas_fom_tick(struct m0_fom *fom0)
 			 * size.
 			 */
 			if (cas_max_reply_payload_exceeded(fom))
-				cas_fom_failure(fom, M0_ERR(-E2BIG),
+				cas_fom_failure(fom, op, M0_ERR(-E2BIG),
 						opc == CO_CUR);
 			else
-				cas_fom_success(fom, opc);
+				cas_fom_success(fom, op, opc);
 			addb2_add_kv_attrs(fom, STATS_KV_OUT);
 		} else {
 			do_ctidx = cas_ctidx_op_needed(fom, opc, ct, ipos);
@@ -1521,7 +1521,7 @@ static int cas_fom_tick(struct m0_fom *fom0)
 	case CAS_IDROP_START_GC:
 		/* Start garbage collector, if it is not already running. */
 		m0_cas_gc_start(&service->c_service);
-		cas_fom_success(fom, opc);
+		cas_fom_success(fom, op, opc);
 		break;
 		/*
 		 * End of states specific to index drop.
