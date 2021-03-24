@@ -69,7 +69,7 @@ static void check(struct m0_be_btree *tree);
 
 static struct m0_be_btree *create_tree(void);
 
-static void destroy_tree(struct m0_be_btree *tree);
+/* static void destroy_tree(struct m0_be_btree *tree); */
 static void truncate_tree(struct m0_be_btree *tree);
 
 
@@ -106,6 +106,8 @@ void m0_be_ut_btree_create_truncate(void)
 	M0_LEAVE();
 }
 
+//extern volatile bool M0_BE_TX_LOGIC_CHANGE_PHASE0;
+
 void m0_be_ut_btree_create_destroy(void)
 {
 	struct m0_be_btree *tree0;
@@ -121,9 +123,15 @@ void m0_be_ut_btree_create_destroy(void)
 	m0_be_ut_seg_init(ut_seg, ut_be, 1ULL << 24);
 	seg = ut_seg->bus_seg;
 
+	M0_LOG(M0_INFO, "HELLO MAX WAS HERE!");
+
+	//M0_BE_TX_LOGIC_CHANGE_PHASE0 = true;
+
 	/* create btrees */
 	tree0 = create_tree();
+	check(tree0);
 
+#if 0
 	m0_be_ut_seg_reload(ut_seg);
 
 	check(tree0);
@@ -131,7 +139,9 @@ void m0_be_ut_btree_create_destroy(void)
 
 	m0_be_ut_seg_reload(ut_seg);
 	m0_be_ut_seg_fini(ut_seg);
+#endif
 	m0_be_ut_backend_fini(ut_be);
+
 	m0_free(ut_seg);
 	m0_free(ut_be);
 
@@ -628,6 +638,7 @@ static void truncate_tree(struct m0_be_btree *tree)
 	M0_LEAVE();
 }
 
+#if 0
 static void destroy_tree(struct m0_be_btree *tree)
 {
 	struct m0_be_tx_credit	cred = {};
@@ -671,6 +682,7 @@ static void destroy_tree(struct m0_be_btree *tree)
 	m0_free(tx);
 	M0_LEAVE();
 }
+#endif
 
 static void cursor_test(struct m0_be_btree *tree)
 {
