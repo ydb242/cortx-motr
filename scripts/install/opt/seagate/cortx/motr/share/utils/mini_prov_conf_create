@@ -1,0 +1,131 @@
+#!/bin/bash
+
+default_prov_config="/opt/seagate/cortx/motr/share/utils/mini_prov_param.conf"
+threenode_yaml_file="/opt/seagate/cortx/motr/share/examples/threenode.yaml"
+HOSTNAME1=""
+HOSTNAME2=""
+HOSTNAME3=""
+MACHINEID1=""
+MACHINEID2=""
+MACHINEID3=""
+
+[[ -r $default_prov_config ]]   && source $default_prov_config
+
+function update_machine_id()
+{
+    MACHINEID1=`cat /etc/machine-id`
+    MACHINEID2=`ssh $HOSTNAME2 cat /etc/machine-id`
+    MACHINEID3=`ssh $HOSTNAME3 cat /etc/machine-id`
+}
+
+function main()
+{
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>name=srvnode-1"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>hostname=$HOSTNAME1"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>type=$TMPL_TYPE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>storage>cvg_count=$TMPL_CVG_NR_GROUP"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>storage>cvg[0]>metadata_devices[0]=$TMPL_METADATADEVICE_00"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>storage>cvg[0]>data_devices[0]=$TMPL_DATADEVICE_00"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>storage>cvg[0]>data_devices[1]=$TMPL_DATADEVICE_01"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>storage>cvg[1]>metadata_devices[0]=$TMPL_METADATADEVICE_10"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>storage>cvg[1]>data_devices[0]=$TMPL_DATADEVICE_10"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>storage>cvg[1]>data_devices[1]=$TMPL_DATADEVICE_11"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>network>data>private_interfaces[0]=$TMPL_IFACE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>network>data>transport_type=$TMPL_XPORT_TYPE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID1>network>data>interface_type=$TMPL_IFACE_TYPE"
+    
+    #configuration for Node-2
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>name=srvnode-2"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>hostname=$HOSTNAME2"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>type=$TMPL_TYPE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>storage>cvg_count=$TMPL_CVG_NR_GROUP"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>storage>cvg[0]>metadata_devices[0]=$TMPL_METADATADEVICE_00"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>storage>cvg[0]>data_devices[0]=$TMPL_DATADEVICE_00"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>storage>cvg[0]>data_devices[1]=$TMPL_DATADEVICE_01"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>storage>cvg[1]>metadata_devices[0]=$TMPL_METADATADEVICE_10"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>storage>cvg[1]>data_devices[0]=$TMPL_DATADEVICE_10"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>storage>cvg[1]>data_devices[1]=$TMPL_DATADEVICE_11"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>network>data>private_interfaces[0]=$TMPL_IFACE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>network>data>transport_type=$TMPL_XPORT_TYPE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID2>network>data>interface_type=$TMPL_IFACE_TYPE"
+    
+    #configuration for node-3
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>name=srvnode-3"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>hostname=$HOSTNAME3"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>type=$TMPL_TYPE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>storage>cvg_count=$TMPL_CVG_NR_GROUP"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>storage>cvg[0]>metadata_devices[0]=$TMPL_METADATADEVICE_00"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>storage>cvg[0]>data_devices[0]=$TMPL_DATADEVICE_00"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>storage>cvg[0]>data_devices[1]=$TMPL_DATADEVICE_01"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>storage>cvg[1]>metadata_devices[0]=$TMPL_METADATADEVICE_10"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>storage>cvg[1]>data_devices[0]=$TMPL_DATADEVICE_10"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>storage>cvg[1]>data_devices[1]=$TMPL_DATADEVICE_11"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>network>data>private_interfaces[0]=$TMPL_IFACE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>network>data>transport_type=$TMPL_XPORT_TYPE"
+    conf json:///root/provisioner_cluster.json set "server_node>$MACHINEID3>network>data>interface_type=$TMPL_IFACE_TYPE"
+    
+    #configure data, parity and spare.
+    CLUSTER_ID=5c427765-ecf5-4387-bfa4-d6d53494b159
+    conf json:///root/provisioner_cluster.json set "cluster>$CLUSTER_ID>storage_set[0]>durability>data=4"
+    conf json:///root/provisioner_cluster.json set "cluster>$CLUSTER_ID>storage_set[0]>durability>parity=2"
+    conf json:///root/provisioner_cluster.json set "cluster>$CLUSTER_ID>storage_set[0]>durability>spare=0"
+    
+    exit 0
+    #cp /root/provisioner_cluster.json on all three nodes on same location.
+    scp /root/provisioner_cluster.json $HOSTNAME2:/root/provisioner_cluster.json
+    scp /root/provisioner_cluster.json $HOSTNAME3:/root/provisioner_cluster.json
+
+    sed -i 's/{HOSTNAME1}/"$HOSTNAME1"/' $threenode_yaml_file
+    sed -i 's/{HOSTNAME2}/"$HOSTNAME2"/' $threenode_yaml_file
+    sed -i 's/{HOSTNAME3}/"$HOSTNAME3"/' $threenode_yaml_file
+}
+
+
+function usage() {
+    cat << EOF
+
+Usage: $SCRIPT_NAME [options]
+    --hostname1 "hostname of first server"
+    --hostname2 "hostname of second server"
+    --hostname3 "hostname of third server"
+
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --hostname1)
+            check_arg_value $1 $2
+            HOSTNAME1="$2"
+            shift
+            ;;
+        --hostname2)
+            check_arg_value $1 $2
+            HOSTNAME2="$2"
+            shift
+            ;;
+        --hostname3)
+            check_arg_value $1 $2
+            HOSTNAME3="$2"
+            shift
+            ;;
+        -h| --help)
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [[ -z "$HOSTNAME1" || -z "$HOSTNAME2" || -z "$HOSTNAME3" ]]; then
+    echo "Invalid Arguments, pass all three hostname as arguments, refer help message for details"
+    exit 1
+fi
+update_machine_id
+echo $HOSTNAME1 $HOSTNAME2 $HOSTNAME3 $MACHINEID1 $MACHINEID2 $MACHINEID3
+if [[ -z "$HOSTNAME1" || -z "$HOSTNAME2" || -z "$HOSTNAME3" || -z "$MACHINEID1" || -z "$MACHINEID2" || -z "$MACHINEID3" ]]; then
+    echo "Invalid Arguments"
+    exit 1
+fi
+main
+exit 0
