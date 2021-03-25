@@ -3,190 +3,168 @@ from pathlib import Path
 import os
 import subprocess
 import re
+import argparse
 from datetime import datetime
 
-def read_excel():
-	xlsx_file = Path('/root', 'libfabric.xlsx')
-	wb_obj = openpyxl.load_workbook(xlsx_file)
-	sheet = wb_obj.active
 
-	col_names = []
-	test_expected = []
-	test_commands = []
-	for column in sheet.iter_cols(1, sheet.max_column):
-		col_names.append(column[0].value)
-		test_commands.append(column[1].value)
-		test_expected.append(column[2].value)
+def read_tests_excel(xlsx_file, list_tests, text_replace):
+    '''
+    @function: This method <read_tests_excel()> loads test details from xlsx excel file
+               and returns list of test dictionaries
+    @author:   venkatesh balagani
+    @returns:  list of dictionaries <Ex: [{}, {},...]>
+    '''
 
-	test_dict = {}
+    # creating workbook obj for given xlsx file
+    wb_obj = openpyxl.load_workbook(xlsx_file)
+    sheet = wb_obj.active
 
-	index = 0
-	for column in col_names:
-		if index > 0:
-			test_dict[col_names[index]] = {"testName":col_names[index], "command":test_commands[index], "expected":test_expected[index]}
-		index = index + 1
-
-	return test_dict
-
-
-##LOADING EXCEL DATA
-test_dict = read_excel()
-#print(test_dict)
-
-##Log file defination
-log_name = datetime.now().strftime('libfabric_%H_%M_%d_%m_%Y.log')
-fylPntr = open("/tmp/{}".format(log_name), "a")
-	
-
-###TESTS
-
-#TEST-1
-output = os.popen(test_dict['Test-001: Verify whether libfabric present']['command'])
-output = output.read()
-#output = output.decode('utf-8')
-
-print("===========================================================")
-print("Test-001: Verify whether libfabric present")
-
-if (test_dict['Test-001: Verify whether libfabric present']['expected']==output.strip()):
-    print("PASS")
-    fylPntr.write("PASS | Test-001: Verify whether libfabric present\n")
-    fylPntr.write("===============================================\n")
-    fylPntr.write("\n{}".format(test_dict['Test-001: Verify whether libfabric present']['command']))
-    fylPntr.write("\n------------------------------------------------\n")  
-    fylPntr.write("\n{}".format(output))
-    fylPntr.write("\n------------------------------------------------\n")
-
-else:
-   print("FAIL")
-   fylPntr.write("FAIL | Test-001: Verify whether libfabric present\n")
-   fylPntr.write("===============================================\n")
-   fylPntr.write("\n{}".format(test_dict['Test-001: Verify whether libfabric present']['command']))
-   fylPntr.write("\n------------------------------------------------\n")
-   fylPntr.write("\n{}".format(output))
-   fylPntr.write("\n------------------------------------------------\n")
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-#TEST-2
-output = os.popen(test_dict['Test-002: Verify fi info provider tcp']['command'])
-output = output.read()
-
-print("===========================================================")
-print("Test-002: Verify fi info provider tcp")
-
-if re.search(test_dict['Test-002: Verify fi info provider tcp']['expected'], output.strip()):
-    print("PASS")
-    fylPntr.write("PASS | Test-002: Verify fi info provider tcp\n")
-    fylPntr.write("===============================================\n")
-    fylPntr.write("\n{}".format(test_dict['Test-002: Verify fi info provider tcp']['command']))
-    fylPntr.write("\n------------------------------------------------\n")  
-    fylPntr.write("\n{}".format(output))
-    fylPntr.write("\n------------------------------------------------\n")
-else:
-    print("FAIL")
-    fylPntr.write("FAIL | Test-002: Verify fi info provider tcp\n")
-    fylPntr.write("===============================================\n")
-    fylPntr.write("\n{}".format(test_dict['Test-002: Verify fi info provider tcp']['command']))
-    fylPntr.write("\n------------------------------------------------\n")  
-    fylPntr.write("\n{}".format(output))
-    fylPntr.write("\n------------------------------------------------\n")
-   
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-#TEST-3
-output = os.popen(test_dict['Test-003: Verify fi info provider sockets']['command'])
-output = output.read()
-
-print("===========================================================")
-print("Test-003: Verify fi info provider sockets")
-
-if re.search(test_dict['Test-003: Verify fi info provider sockets']['expected'], output.strip()):
-    print("PASS")
-    fylPntr.write("PASS | Test-003: Verify fi info provider sockets\n")
-    fylPntr.write("===============================================\n")
-    fylPntr.write("\n{}".format(test_dict['Test-003: Verify fi info provider sockets']['command']))
-    fylPntr.write("\n------------------------------------------------\n")  
-    fylPntr.write("\n{}".format(output))
-    fylPntr.write("\n------------------------------------------------\n")
-else:
-    print("FAIL")
-    fylPntr.write("FAIL | Test-003: Verify fi info provider sockets\n")
-    fylPntr.write("===============================================\n")
-    fylPntr.write("\n{}".format(test_dict['Test-003: Verify fi info provider sockets']['command']))
-    fylPntr.write("\n------------------------------------------------\n")  
-    fylPntr.write("\n{}".format(output))
-    fylPntr.write("\n------------------------------------------------\n")
-   
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-#TEST-4
-print("===========================================================")
-print("Test-004: Verify fi info provider verbs")
-output = os.popen(test_dict['Test-004: Verify fi info provider verbs']['command'])
-output = output.read()
-
-hostname = os.popen("hostname")
-hostname = hostname.read()
-
-if re.search("vm", hostname.strip()):
-    if ((test_dict['Test-004: Verify fi info provider verbs']['expected']).strip()==output.strip()):
-        print("PASS")
-        fylPntr.write("PASS | Test-004: Verify fi info provider verbs\n")
-        fylPntr.write("===============================================\n")
-        fylPntr.write("\n{}".format(test_dict['Test-004: Verify fi info provider verbs']['command']))
-        fylPntr.write("\n------------------------------------------------\n")  
-        fylPntr.write("\n{}".format(output))
-        fylPntr.write("\n------------------------------------------------\n")
+    # creating rows into lists <Ex: [[], [],...]>
+    rowList = []
+    for row in sheet.iter_rows(1, sheet.max_row):
+        columnList = []
+        for col in row:
+            columnList.append(str(col.value).replace('xx.xxx.xxx.xx', text_replace))
+        rowList.append(columnList)
+        del columnList
+    # print(rowList)
+    
+    # User Specific tests if mentioned in argument
+    list_rows = []
+    if len(list_tests) > 0:
+        for test_case in list_tests:
+            for row in rowList:
+                if row[0] == test_case:
+                    list_rows.append(row)
     else:
-        print("PASS | VM doesn't have 'verbs' as already known")
-        fylPntr.write("PASS | VM doesn't have 'verbs' as already known | Test-004: Verify fi info provider verbs\n")
-        fylPntr.write("===============================================\n")
-        fylPntr.write("\n{}".format(test_dict['Test-004: Verify fi info provider verbs']['command']))
-        fylPntr.write("\n------------------------------------------------\n")  
-        fylPntr.write("\n{}".format(output))
-        fylPntr.write("\n------------------------------------------------\n")
-else:
-    if re.search(test_dict['Test-004: Verify fi info provider verbs']['expected'], output.strip()):
-        print("PASS | HW does have 'verbs'")
-        fylPntr.write("PASS | Test-004: Verify fi info provider verbs\n")
-        fylPntr.write("===============================================\n")
-        fylPntr.write("\n{}".format(test_dict['Test-004: Verify fi info provider verbs']['command']))
-        fylPntr.write("\n------------------------------------------------\n")  
-        fylPntr.write("\n{}".format(output))
-        fylPntr.write("\n------------------------------------------------\n")
-    else:
-        print("FAIL | HW doesn't have 'verbs'")
-        fylPntr.write("FAIL | Test-004: Verify fi info provider verbs\n")
-        fylPntr.write("===============================================\n")
-        fylPntr.write("\n{}".format(test_dict['Test-004: Verify fi info provider verbs']['command']))
-        fylPntr.write("\n------------------------------------------------\n")  
-        fylPntr.write("\n{}".format(output))
-        fylPntr.write("\n------------------------------------------------\n")
-   
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        list_rows = rowList
+    # print(list_rows)
+    
+    '''
+    creating list of test dictionaries with values in rows and with keys in ...
+    variable names in first row <Ex: [{}, {},...]>
+    '''
+    row_index = 0
+    list_test_dicts = []
+    for row in list_rows:
+        if row_index > 0 or (len(list_tests) > 0):
+            list_test_dicts.append(dict(zip(rowList[0], row)))
+        row_index = row_index + 1
+    # print(list_test_dicts)
+    return list_test_dicts
 
-#TEST-5
-print("===========================================================")
-print("Test-005: Verify fi ping pong")
-start_server = subprocess.Popen('fi_pingpong -e msg -p tcp', shell=True)
-output = os.popen(test_dict['Test-005: Verify fi ping pong']['command'])
-output = output.read()	
-subprocess.Popen.kill(start_server)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def test_engine(list_test_dictionaries, stp_frst_flr):
+    '''
+    @function: This method picks up test by test from 'list_test_dictionaries' 
+               and executes the same unto the last test
+    @author:   venkatesh balagani
+    @args:     list_test_dictionaries = List contains test dictionaries
+               srvr_addr              = Server Address for Pingpong Test
+               stp_frst_flr           = Stop on First Failure
+    @returns:  Nothing
+    '''
 
-if re.search(test_dict['Test-005: Verify fi ping pong']['expected'], output.strip()):
-    print("PASS")
-    fylPntr.write("PASS | Test-005: Verify fi ping pong\n")
-    fylPntr.write("===============================================\n")
-    fylPntr.write("\n{}".format(test_dict['Test-005: Verify fi ping pong']['command']))
-    fylPntr.write("\n------------------------------------------------\n")  
-    fylPntr.write("\n{}".format(output))
-    fylPntr.write("\n------------------------------------------------\n")
-else:
-    print("FAIL")
-    fylPntr.write("FAIL | Test-005: Verify fi ping pong\n")
-    fylPntr.write("===============================================\n")
-    fylPntr.write("\n{}".format(test_dict['Test-005: Verify fi ping pong']['command']))
-    fylPntr.write("\n------------------------------------------------\n")  
-    fylPntr.write("\n{}".format(output))
-    fylPntr.write("\n------------------------------------------------\n")
+    # Log file definition <@Location: /tmp/libfabric_%H_%M_%d_%m_%Y.log>
+    log_name = datetime.now().strftime('libfabric_%H_%M_%d_%m_%Y.log')
+    fylPntr = open("/tmp/{}".format(log_name), "a")
+    
+    passCount = 0
+    failCount = 0
+    listFailedTests = []
+    for test in list_test_dictionaries:  
+        print("===========================================================")
+        print(test['TestName'])
+
+        match = 0
+        if str(test['HW-specific']).upper() == "YES":
+            hostname = os.popen("hostname")
+            hostname = hostname.read()
+            if re.search("vm", hostname.strip()):
+                match = 1
+
+        if match == 1:
+            print("PASS | {}".format(test['message']))
+            fylPntr.write("PASS | {} | {}\n".format(test['message'], test['TestName']))
+            fylPntr.write("===============================================\n")
+            fylPntr.write("\n{}".format(test['command']))
+            fylPntr.write("\n------------------------------------------------\n")
+            fylPntr.write("\n{}".format(output))
+            fylPntr.write("\n------------------------------------------------\n")
+            passCount = passCount + 1
+        else:
+            # if-server-instance-required
+            if str(test['server']).upper() == "YES":
+                start_server = subprocess.Popen(test['server-command'], shell=True)
+
+            # command-exec
+            output = os.popen(test['command'])
+            output = output.read()
+
+            # closing-server-instance-if-opened
+            if str(test['server']).upper() == "YES":
+                subprocess.Popen.kill(start_server)
+
+            match = 0
+            if str(test['match-sub']).upper() == "YES":
+                if re.search(test['expected'], output.strip()):
+                    match = 1
+            else:
+                if test['expected'] == output.strip():
+                    match = 1
+
+            if match == 1:
+                print("PASS")
+                fylPntr.write("PASS | {}\n".format(test['TestName']))
+                fylPntr.write("===============================================\n")
+                fylPntr.write("\n{}".format(test['command']))
+                fylPntr.write("\n------------------------------------------------\n")
+                fylPntr.write("\n{}".format(output))
+                fylPntr.write("\n------------------------------------------------\n")
+                passCount = passCount + 1
+
+            else:
+                print("FAIL")
+                fylPntr.write("FAIL | {}\n".format(test['TestName']))
+                fylPntr.write("===============================================\n")
+                fylPntr.write("\n{}".format(test['command']))
+                fylPntr.write("\n------------------------------------------------\n")
+                fylPntr.write("\n{}".format(output))
+                fylPntr.write("\n------------------------------------------------\n")
+                failCount = failCount + 1
+                listFailedTests.append(test['TestName'])
+                
+                if stp_frst_flr:
+                    print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                    print(test['TestName'])
+                    print("Find full log: /tmp/{}".format(log_name))
+                    raise Exception('Stopping on first test failure itself')
+                    print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+    print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("Find full log: /tmp/{}".format(log_name))
+    print("Total tests: ", len(list_test_dicts))
+    print("PASS: {}".format(passCount))
+    print("FAIL: {}".format(failCount))
+    print("Failed Tests: ", listFailedTests)
+    print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    
+# Command line Arguments <PARSER>
+parser = argparse.ArgumentParser(description="Basic Arguments to run Libfabric")
+parser.add_argument('-xl', action='store', default="libfabric.xlsx", dest='excelFile', help='Excel XLSX File')
+parser.add_argument('-srvr_addr', action='store', default="127.0.0.1", dest='serverAddress', help='Server Address')
+parser.add_argument('-tests', nargs='+', default=[], dest='testCasesList', help='Provide specifi Tests to run <Ex: [test1, test2,...], in default run all tests>')
+parser.add_argument('-stop_on_error', action='store', default=False, dest='returnOnFirstFailure', help='Stop the script '
+                                                                                                    'on first failure')
+args = parser.parse_args()
+list_of_TCs = list(args.testCasesList)
+print('Excel File Path                     = {!r}'.format(args.excelFile))
+print('Server Address                      = {!r}'.format(args.serverAddress))
+print('Tests to Run                        = {!r}'.format(list_of_TCs))
+print('Stop the script on First Failure    = {!r}'.format(args.returnOnFirstFailure))
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    
+# Calling Functions
+list_test_dicts = read_tests_excel(args.excelFile, list_of_TCs, args.serverAddress)
+test_engine(list_test_dicts, args.returnOnFirstFailure)
