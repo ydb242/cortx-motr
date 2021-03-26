@@ -1133,9 +1133,6 @@ M0_INTERNAL void m0_rpc_item_send(struct m0_rpc_item *item)
 	int      rc;
 	static int item_sent_cnt;
 
-
-	M0_LOG(M0_ALWAYS, "ri_opcode : %u, sent_cnt : %d ri_nr_sent : %u",
-		item->ri_type->rit_opcode, item_sent_cnt, item->ri_nr_sent);
 	M0_ENTRY(ITEM_FMT" dest_ep=%s ri_session=%p ri_nr_sent_max=%"PRIu64
 		 " ri_deadline=%"PRIu64" ri_nr_sent=%u", ITEM_ARG(item),
 		 m0_rpc_item_remote_ep_addr(item),
