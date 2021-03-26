@@ -410,7 +410,8 @@ void m0_obj_init(struct m0_obj *obj,
 
 	/* set the blocksize to a reasonable default */
 	obj->ob_attr.oa_bshift = M0_DEFAULT_BUF_SHIFT;
-	obj->ob_attr.oa_layout_id = layout_id ?: M0_DEFAULT_LAYOUT_ID;
+//	obj->ob_attr.oa_layout_id = layout_id ?: M0_DEFAULT_LAYOUT_ID;
+	obj->ob_attr.oa_layout_id = M0_DEFAULT_LAYOUT_ID;
 
 #ifdef OSYNC
 	m0_mutex_init(&obj->ob_pending_tx_lock);
