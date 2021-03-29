@@ -211,6 +211,7 @@ enum m0_balloc_super_block_version {
 
 enum {
 	M0_BALLOC_BUDDY_LOOKUP_MAX = 10,
+	M0_BALLOC_MAX_BTREES = 20,
 };
 
 /**
@@ -236,7 +237,7 @@ struct m0_balloc {
 	 * before the m0_format_footer, where only persistent fields allowed
 	 */
 	/** db for free extent */
-	struct m0_be_btree           cb_db_group_extents;
+	struct m0_be_btree           cb_db_group_extents[M0_BALLOC_MAX_BTREES];
 	/** db for group desc */
 	struct m0_be_btree           cb_db_group_desc;
 

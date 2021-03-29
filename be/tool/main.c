@@ -108,6 +108,7 @@ void track_cob_btrees(struct m0_cob_domain *cdom, bool print_btree)
 void track_ad_btrees(struct stob_ad_0type_rec *rec, bool print_btree)
 {
 	struct m0_balloc         *m0balloc;
+	int                      i;
 
 	m0balloc = container_of(rec->sa0_ad_domain->sad_ballroom,
 				struct m0_balloc, cb_ballroom);
@@ -116,7 +117,9 @@ void track_ad_btrees(struct stob_ad_0type_rec *rec, bool print_btree)
 		M0_LOG(M0_ALWAYS, "em_mapping");
 		btree_dbg_print(&rec->sa0_ad_domain->sad_adata.em_mapping);
 		M0_LOG(M0_ALWAYS, "grp_exts");
-		btree_dbg_print(&m0balloc->cb_db_group_extents);
+		for (i = 0; i < ARRAY_SIZE(m0balloc->cb_db_group_extents); i++) {
+			btree_dbg_print(&m0balloc->cb_db_group_extents[i]);
+		}
 		M0_LOG(M0_ALWAYS, "grp_dsc");
 		btree_dbg_print(&m0balloc->cb_db_group_desc);
 	} else
