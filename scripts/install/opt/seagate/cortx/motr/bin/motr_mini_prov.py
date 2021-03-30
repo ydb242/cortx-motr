@@ -558,7 +558,15 @@ def lvm_exist(self):
 
 def cluster_up(self):
     cmd = 'hctl status'
-    op = subprocess.run(["hctl", "status"])
+    op = subprocess.run(list(cmd.split(' ')))
+    if op.returncode == 0:
+        return True
+    else:
+        return False
+
+def pkg_installed(self, pkg):
+    cmd = f'yum list installed {pkg}'
+    op = subprocess.run(list(cmd.split(' ')))
     if op.returncode == 0:
         return True
     else:
