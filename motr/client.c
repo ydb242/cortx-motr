@@ -396,7 +396,9 @@ void m0_obj_init(struct m0_obj *obj,
 		 const struct m0_uint128 *id,
 		 uint64_t layout_id)
 {
-	M0_ENTRY();
+//	M0_ENTRY();
+	M0_LOG(M0_DEBUG, "obj init, layout_id : %llu",
+			(unsigned long long) layout_id);
 
 	M0_PRE(obj != NULL);
 	M0_PRE(parent != NULL);
@@ -410,8 +412,8 @@ void m0_obj_init(struct m0_obj *obj,
 
 	/* set the blocksize to a reasonable default */
 	obj->ob_attr.oa_bshift = M0_DEFAULT_BUF_SHIFT;
-//	obj->ob_attr.oa_layout_id = layout_id ?: M0_DEFAULT_LAYOUT_ID;
-	obj->ob_attr.oa_layout_id = M0_DEFAULT_LAYOUT_ID;
+	obj->ob_attr.oa_layout_id = layout_id ?: M0_DEFAULT_LAYOUT_ID;
+//	obj->ob_attr.oa_layout_id = M0_DEFAULT_LAYOUT_ID;
 
 #ifdef OSYNC
 	m0_mutex_init(&obj->ob_pending_tx_lock);
