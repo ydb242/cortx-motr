@@ -547,6 +547,10 @@ static void dix_build(const struct m0_op_idx *oi,
 {
 	M0_SET0(out);
 	out->dd_fid = *OI_IFID(oi);
+        /* Hardcoded layout values */
+        out->dd_layout.dl_type = DIX_LTYPE_DESCR;
+        out->dd_layout.u.dl_desc.ld_hash_fnc = HASH_FNC_CITY;
+        out->dd_layout.u.dl_desc.ld_pver = dix_inst(oi)->di_index_pver;
 }
 
 static void cas_req_init(struct dix_req   *req,
