@@ -223,6 +223,7 @@ include $(top_srcdir)/dtm/Makefile.sub
 include $(top_srcdir)/dtm0/Makefile.sub
 include $(top_srcdir)/fd/Makefile.sub
 include $(top_srcdir)/fdmi/Makefile.sub
+include $(top_srcdir)/fdmi/plugins/Makefile.sub
 include $(top_srcdir)/fid/Makefile.sub
 include $(top_srcdir)/file/Makefile.sub
 include $(top_srcdir)/fis/Makefile.sub
@@ -839,6 +840,15 @@ console_m0console_LDADD     = $(top_builddir)/motr/libmotr.la
 sbin_PROGRAMS     += ha/m0ham
 ha_m0ham_CPPFLAGS  = -DM0_TARGET='m0ham' $(AM_CPPFLAGS)
 ha_m0ham_LDADD     = $(top_builddir)/motr/libmotr.la
+
+#
+# fdmi/plugins/m0sched -------------------------------------------- {{{2
+#
+
+sbin_PROGRAMS     += fdmi/plugins/m0sched
+sbin_SCRIPTS     += fdmi/plugins/m0scheduler
+fdmi_plugins_m0sched_CPPFLAGS  = -DM0_TARGET='m0sched' $(AM_CPPFLAGS)
+fdmi_plugins_m0sched_LDADD     = $(top_builddir)/motr/libmotr.la
 
 #
 # pool/m0poolmach ------------------------------------- {{{2

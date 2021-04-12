@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+#
+# Copyright (c) 2021 Seagate Technology LLC and/or its Affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# For any questions about this software or licensing,
+# please email opensource@seagate.com or cortx-questions@seagate.com.
+#
+import subprocess
+import signal
+from socket import gethostname
+import shlex
+import sys
+import json
+import ast
+import codecs
+
+kv_records = [] #global kv cache
+
+def str_decode(encoded):
+	if encoded == "0" :
+		return encoded;
+	#return codecs.decode(encoded, 'hex').decode('utf-8')
+	return codecs.decode(encoded, 'hex')
+
+def json_parser(kv_record):
+	kvs = json.loads(kv_record)
+	kv = {'fid': str_decode(kvs["fid"]), 'cr_key': str_decode(kvs["cr_key"]), 'cr_val': str_decode(kvs["cr_val"])}
+	#kv = {'fid': kvs["fid"], 'cr_key': kvs["cr_key"], 'cr_val': kvs["cr_val"]}
+	flag =  True
+
+	#check dedup records
+	for kv_i in kv_records:
+		if kv['cr_key'] == kv_i['cr_key'] and kv['cr_val'] != "0":
+			#print(kv_records)
+			print("dedup: ", kv_i, kv)
+			flag = False
+			break
+
+	#if  record is not dedupable, add to cache
+	if flag == True and kv['cr_val'] != "0":
+		print("new kv: ", kv)
+		kv_records.append(kv)
+
+#handle SIGNT and SIGTERM
+def signal_handler(sig, frame):
+	print("CTRL + C pressed")
+	process.send_signal(sig)
+	process.wait()
+	#print(kv_records)
+	sys.exit(0)
+
+def execute_command_and_get_output(cmd):
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    shell=True)
+    stdout, stderr = proc.communicate()
+    output_var = str(stdout, 'utf-8')
+    return output_var
+
+
+#m0sched -l 192.168.52.53@tcp:12345:4:1 -h 192.168.52.53@tcp:12345:1:1 -p 0x7000000000000001:0x37 -f 0x7200000000000001:0x19
+def get_m0sched_cmd():
+	#m0sched = "/home/931442/cortx-motr/fdmi/plugins/m0sched"
+	m0sched = "m0sched"
+	opts = " -l " + local_endpoint + " -h " + ha_endpoint + " -p " + profile_fid + " -f " + process_fid
+	return m0sched + opts
+
+#get local ep, ha ep, profile fid and process fid
+def get_cluster_info():
+    ret = 0
+    global profile_fid
+    global ha_endpoint
+    global local_endpoint
+    global process_fid
+    cmd = 'hctl status --json'
+    cluster_info = execute_command_and_get_output(cmd)
+    cluster_js = json.loads(cluster_info)
+    if (cluster_info != None):
+        profile_fid = str(cluster_js["profiles"][0]["fid"])
+        nodes_data = cluster_js["nodes"]
+        for svcs in nodes_data[0]['svcs']:
+            if svcs['name'] == 'hax':
+                ha_endpoint = str(svcs['ep'])
+
+            #m0sched alway uses first m0client
+            if svcs['name'] == 'm0_client':
+                local_endpoint = str(svcs['ep'])
+                process_fid = str(svcs['fid'])
+                break
+    else:
+        print("Could not fetch cluster info\n", file=sys.stderr)
+        return -1
+    print ("local:", local_endpoint," ha:", ha_endpoint, "prof: ", profile_fid, "proc:", process_fid)
+    return ret
+
+def run_command(command):
+    global process
+    process = subprocess.Popen(shlex.split(command), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    while True:
+        output = process.stdout.readline()
+
+        if output:
+            fid = "fid"
+            record = output.decode("utf-8")
+            if fid in record:
+               json_parser(record)
+
+        if process.poll() is not None:
+            print("Exiting because m0sched exited");
+            break
+
+    rc = process.poll()
+    return rc
+
+
+#register signal handler
+signal.signal(signal.SIGINT, signal_handler)
+
+get_cluster_info();
+
+#execute m0sched
+run_command(get_m0sched_cmd())
