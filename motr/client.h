@@ -655,6 +655,18 @@ enum m0_op_state {
 };
 
 /**
+ * Custom state
+ */
+enum m0_custom_state {
+	M0_CS_UNINIT,
+	M0_CS_INIT,
+	M0_CS_STARTED,
+	M0_CS_HALF_EXECUTED,
+	M0_CS_FINISHED,
+	M0_CS_NR
+};
+
+/**
  * Common structure shared by objects, indices and realms.
  */
 struct m0_entity {

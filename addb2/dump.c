@@ -868,6 +868,17 @@ static void dtx0_state_counter(struct m0_addb2__context *ctx, char *buf)
 	sm_trans(&dtx_sm_conf, "dtx0", ctx, buf);
 }
 
+extern struct m0_sm_conf m0_custom_sm_conf;
+static void custom_state(struct m0_addb2__context *ctx, const uint64_t *v,
+                     char *buf)
+{
+	sm_state(&m0_custom_sm_conf, ctx, v, buf);
+}
+
+static void custom_state_counter(struct m0_addb2__context *ctx, char *buf)
+{
+	sm_trans(&m0_custom_sm_conf, "custom-state", ctx, buf);
+}
 
 extern struct m0_sm_conf op_states_conf;
 static void beop_state_counter(struct m0_addb2__context *ctx, char *buf)
@@ -1247,6 +1258,18 @@ struct m0_addb2__id_intrp ids[] = {
 	{ M0_AVI_ATTR, "attr", { &dec, &attr, &skip },
 	  { "entity_id", NULL, NULL } },
 	{ M0_AVI_NODATA,          "nodata" },
+
+	{ M0_AVI_CUSTOM_PROBE1, "custom-probe1", { &dec, &dec}, { "nr", "opcode"} },
+	{ M0_AVI_CUSTOM_PROBE2, "custom-probe2", { &dec}, { "state"} },
+	
+	{ M0_AVI_CUSTOM_SM_STATE,     "custom-layer",    { &custom_state, SKIP2  } },
+	{ M0_AVI_CUSTOM_SM_COUNTER,   "",
+	  .ii_repeat = M0_AVI_CUSTOM_SM_COUNTER_END - M0_AVI_CUSTOM_SM_COUNTER,
+	  .ii_spec   = &custom_state_counter },
+
+	{ M0_AVI_CUSTOM_TO_CLIENT,      "custom-to-client", { &dec, &dec },
+	  { "custom_id", "client_id" } },
+
 };
 
 static void id_init(void)

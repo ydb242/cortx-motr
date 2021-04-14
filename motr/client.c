@@ -217,6 +217,47 @@ struct m0_sm_conf entity_conf = {
 	.scf_trans_nr = ARRAY_SIZE(entity_trans),
 };
 
+
+struct m0_sm_state_descr m0_custom_phases[] = {
+	[M0_CS_INIT] = {
+		.sd_flags = M0_SDF_INITIAL | M0_SDF_FINAL,
+		.sd_name = "initialised",
+		.sd_allowed = M0_BITS(M0_CS_STARTED),
+	},
+	[M0_CS_STARTED] = {
+		.sd_name = "started",
+		.sd_allowed = M0_BITS(M0_CS_HALF_EXECUTED),
+	},
+	[M0_CS_HALF_EXECUTED] = {
+		.sd_name = "half-exec",
+		.sd_allowed = M0_BITS(M0_CS_FINISHED),
+	},
+	[M0_CS_FINISHED] = {
+		.sd_flags = M0_SDF_FINAL | M0_SDF_TERMINAL,
+		.sd_name = "finished",
+	},
+};
+
+/**
+ * Textual descriptions for the valid state machine transitions.
+ */
+struct m0_sm_trans_descr m0_custom_trans[] = {
+	{"test-started", M0_CS_INIT, M0_CS_STARTED},
+	{"test-half-exec", M0_CS_STARTED, M0_CS_HALF_EXECUTED},
+	{"test-finished", M0_CS_HALF_EXECUTED, M0_CS_FINISHED},
+};
+
+/**
+ * Configuration structure for the custom operation state machine.
+ */
+struct m0_sm_conf m0_custom_sm_conf = {
+	.scf_name = "custom-conf",
+	.scf_nr_states = ARRAY_SIZE(m0_custom_phases),
+	.scf_state = m0_custom_phases,
+	.scf_trans = m0_custom_trans,
+	.scf_trans_nr = ARRAY_SIZE(m0_custom_trans),
+};
+
 /**----------------------------------------------------------------------------*
  *                                Helper functions                             *
  *-----------------------------------------------------------------------------*/

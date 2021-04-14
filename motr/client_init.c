@@ -1488,6 +1488,10 @@ M0_INTERNAL int m0_client_global_init(void)
 				 M0_AVI_IOO_REQ,
 				 M0_AVI_IOO_REQ_COUNTER);
 
+	m0_sm_conf_init(&m0_custom_sm_conf);
+	m0_sm_addb2_init(&m0_custom_sm_conf, M0_AVI_CUSTOM_SM_STATE, 
+			 M0_AVI_CUSTOM_SM_COUNTER);
+	
 	return M0_RC(rc);
 }
 

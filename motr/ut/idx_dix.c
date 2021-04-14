@@ -73,6 +73,9 @@ static struct m0_rpc_server_ctx dix_ut_sctx = {
 		.rsx_log_file_name    = SERVER_LOG_FILE_NAME
 };
 
+static void custom_to_client_map(const struct m0_sm *custom_sm,
+				 const struct m0_op *op);
+
 static void dix_config_init()
 {
 	struct m0_fid pver = M0_FID_TINIT('v', 1, 100);
@@ -1019,6 +1022,149 @@ static void exec_until_stable(uint64_t nr, enum m0_idx_opcode opcode)
 	m0_free(val);
 }
 
+
+/* Submits multiple M0 client (PUT|DEL) operations and then waits on EXECUTED,
+ * and then waits on STABLE.
+ */
+static void function_of_interest(uint64_t nr, enum m0_idx_opcode opcode)
+{
+	struct m0_idx      *idx = &duc.duc_idx;
+	struct m0_op      **ops;
+	struct m0_op       *op = NULL;
+	int                *rcs;
+	struct m0_bufvec   *key_vecs;
+	char               *val = NULL;
+	struct m0_bufvec    vals = {};
+	m0_bcount_t         len = 1;
+	int                 flags = 0;
+	uint64_t            i;
+	int                 rc;
+
+	M0_PRE(M0_IN(opcode, (M0_IC_PUT, M0_IC_DEL)));
+	M0_ALLOC_ARR(ops, nr);
+	M0_UT_ASSERT(ops != NULL);
+	M0_ALLOC_ARR(rcs, nr);
+	M0_UT_ASSERT(rcs != NULL);
+	M0_ALLOC_ARR(key_vecs, nr);
+	M0_UT_ASSERT(key_vecs != NULL);
+
+	if (opcode == M0_IC_PUT) {
+		val = m0_strdup("ItIsAValue");
+		M0_UT_ASSERT(val != NULL);
+		vals = M0_BUFVEC_INIT_BUF((void **) &val, &len);
+	}
+
+	/* Execute the ops */
+	for (i = 0; i < nr; ++i) {
+		rc = m0_bufvec_alloc(&key_vecs[i], 1, sizeof(i));
+		M0_UT_ASSERT(key_vecs[i].ov_vec.v_count[0] == sizeof(i));
+		memcpy(key_vecs[i].ov_buf[0], &i, sizeof(i));
+
+		rc = m0_idx_op(idx, opcode, &key_vecs[i],
+			       opcode == M0_IC_DEL ? NULL : &vals,
+			       &rcs[i], flags, &ops[i]);
+		M0_UT_ASSERT(rc == 0);
+		m0_op_launch(&ops[i], 1);
+
+		rc = m0_op_wait(ops[i], M0_BITS(M0_OS_EXECUTED), WAIT_TIMEOUT);
+		M0_LOG(M0_DEBUG, "Got executed %" PRIu64, i);
+		if (rc == -ESRCH)
+			M0_UT_ASSERT(ops[i]->op_sm.sm_state == M0_OS_STABLE);
+	}
+
+	/* Wait until they get stable */
+	for (i = 0; i < nr; ++i) {
+		op = ops[i];
+		rc = m0_op_wait(op, M0_BITS(M0_OS_STABLE), WAIT_TIMEOUT);
+		M0_LOG(M0_DEBUG, "Got stable %" PRIu64,i);
+		M0_UT_ASSERT(rc == 0);
+		M0_UT_ASSERT(op->op_rc == 0);
+		M0_UT_ASSERT(rcs[0] == 0);
+		m0_op_fini(op);
+		m0_op_free(op);
+		ops[i] = NULL;
+		op = NULL;
+		m0_bufvec_free(&key_vecs[i]);
+	}
+
+	m0_free(key_vecs);
+	m0_free(ops);
+	m0_free(val);
+}
+
+/* Submits multiple M0 client (PUT|DEL) operations and then waits on EXECUTED,
+ * and then waits on STABLE.
+ */
+static void function_of_interest2(uint64_t nr, enum m0_idx_opcode opcode,
+				  struct m0_sm *upper_layer_sm)
+{
+	struct m0_idx      *idx = &duc.duc_idx;
+	struct m0_op      **ops;
+	struct m0_op       *op = NULL;
+	int                *rcs;
+	struct m0_bufvec   *key_vecs;
+	char               *val = NULL;
+	struct m0_bufvec    vals = {};
+	m0_bcount_t         len = 1;
+	int                 flags = 0;
+	uint64_t            i;
+	int                 rc;
+
+	M0_PRE(M0_IN(opcode, (M0_IC_PUT, M0_IC_DEL)));
+	M0_ALLOC_ARR(ops, nr);
+	M0_UT_ASSERT(ops != NULL);
+	M0_ALLOC_ARR(rcs, nr);
+	M0_UT_ASSERT(rcs != NULL);
+	M0_ALLOC_ARR(key_vecs, nr);
+	M0_UT_ASSERT(key_vecs != NULL);
+
+	if (opcode == M0_IC_PUT) {
+		val = m0_strdup("ItIsAValue");
+		M0_UT_ASSERT(val != NULL);
+		vals = M0_BUFVEC_INIT_BUF((void **) &val, &len);
+	}
+
+	/* Execute the ops */
+	for (i = 0; i < nr; ++i) {
+		rc = m0_bufvec_alloc(&key_vecs[i], 1, sizeof(i));
+		M0_UT_ASSERT(key_vecs[i].ov_vec.v_count[0] == sizeof(i));
+		memcpy(key_vecs[i].ov_buf[0], &i, sizeof(i));
+
+		rc = m0_idx_op(idx, opcode, &key_vecs[i],
+			       opcode == M0_IC_DEL ? NULL : &vals,
+			       &rcs[i], flags, &ops[i]);
+		M0_UT_ASSERT(rc == 0);
+		m0_op_launch(&ops[i], 1);
+
+		custom_to_client_map(upper_layer_sm, ops[i]);
+		
+		rc = m0_op_wait(ops[i], M0_BITS(M0_OS_EXECUTED), WAIT_TIMEOUT);
+		M0_LOG(M0_DEBUG, "Got executed %" PRIu64, i);
+		if (rc == -ESRCH)
+			M0_UT_ASSERT(ops[i]->op_sm.sm_state == M0_OS_STABLE);
+	}
+
+	/* Wait until they get stable */
+	for (i = 0; i < nr; ++i) {
+		op = ops[i];
+		rc = m0_op_wait(op, M0_BITS(M0_OS_STABLE), WAIT_TIMEOUT);
+		M0_LOG(M0_DEBUG, "Got stable %" PRIu64,i);
+		M0_UT_ASSERT(rc == 0);
+		M0_UT_ASSERT(op->op_rc == 0);
+		M0_UT_ASSERT(rcs[0] == 0);
+		m0_op_fini(op);
+		m0_op_free(op);
+		ops[i] = NULL;
+		op = NULL;
+		m0_bufvec_free(&key_vecs[i]);
+	}
+
+	m0_free(key_vecs);
+	m0_free(ops);
+	m0_free(val);
+}
+
+
 static void st_dtm0(void)
 {
 	idx_setup();
@@ -1039,6 +1185,7 @@ static void st_dtm0_putdel(void)
 	idx_teardown();
 }
 
+
 static void st_dtm0_e_then_s(void)
 {
 	idx_setup();
@@ -1046,6 +1193,114 @@ static void st_dtm0_e_then_s(void)
 	exec_then_stable(100, M0_IC_DEL);
 	idx_teardown();
 }
+
+enum m0_custom_probe_state {
+	M0_CPS_STARTED = 0,
+	M0_CPS_HALF_EXECUTED,
+	M0_CPS_FINISHED,
+};
+
+static void st_addb_probe(void)
+{
+	uint64_t nr = 20;
+
+	idx_setup();
+	
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE1, nr, M0_IC_PUT);
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE2, M0_CPS_STARTED);
+	function_of_interest(nr, M0_IC_PUT);
+
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE1, nr, M0_IC_DEL);
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE2, M0_CPS_HALF_EXECUTED);
+	function_of_interest(nr, M0_IC_DEL);
+
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE2, M0_CPS_FINISHED);
+	
+	idx_teardown();
+
+	m0_addb2_force_all();
+}
+
+static void st_addb_layer(void)
+{
+	struct m0_sm_group custom_grp;
+	struct m0_sm       custom_sm;
+	uint64_t           nr = 20;
+	
+	m0_sm_group_init(&custom_grp);
+	m0_sm_group_lock(&custom_grp);
+
+	m0_sm_init(&custom_sm, &m0_custom_sm_conf,
+		   M0_CS_INIT, &custom_grp);
+	m0_sm_addb2_counter_init(&custom_sm);
+	
+	idx_setup();
+
+	m0_sm_move(&custom_sm, 0, M0_CS_STARTED);
+
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE1, nr, M0_IC_PUT);
+	function_of_interest(nr, M0_IC_PUT);
+	
+	m0_sm_move(&custom_sm, 0, M0_CS_HALF_EXECUTED);
+
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE1, nr, M0_IC_DEL);
+	function_of_interest(nr, M0_IC_DEL);
+	
+	m0_sm_move(&custom_sm, 0, M0_CS_FINISHED);
+
+	idx_teardown();
+
+	m0_addb2_force_all();
+
+	m0_sm_fini(&custom_sm);
+	m0_sm_group_unlock(&custom_grp);
+	m0_sm_group_fini(&custom_grp);
+}
+
+static void custom_to_client_map(const struct m0_sm *custom_sm,
+				 const struct m0_op *op)
+{
+	uint64_t custom_id = m0_sm_id_get(custom_sm);
+	uint64_t client_id = m0_sm_id_get(&op->op_sm);
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_TO_CLIENT, custom_id, client_id);
+}
+
+static void st_addb_relation(void)
+{
+	struct m0_sm_group custom_grp;
+	struct m0_sm       custom_sm;
+	uint64_t           nr = 20;
+	
+	m0_sm_group_init(&custom_grp);
+	m0_sm_group_lock(&custom_grp);
+
+	m0_sm_init(&custom_sm, &m0_custom_sm_conf,
+		   M0_CS_INIT, &custom_grp);
+	m0_sm_addb2_counter_init(&custom_sm);
+	
+	idx_setup();
+
+	m0_sm_move(&custom_sm, 0, M0_CS_STARTED);
+
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE1, nr, M0_IC_PUT);
+	function_of_interest2(nr, M0_IC_PUT, &custom_sm);
+	
+	m0_sm_move(&custom_sm, 0, M0_CS_HALF_EXECUTED);
+
+	M0_ADDB2_ADD(M0_AVI_CUSTOM_PROBE1, nr, M0_IC_DEL);
+	function_of_interest2(nr, M0_IC_DEL, &custom_sm);
+	
+	m0_sm_move(&custom_sm, 0, M0_CS_FINISHED);
+
+	idx_teardown();
+
+	m0_addb2_force_all();
+
+	m0_sm_fini(&custom_sm);
+	m0_sm_group_unlock(&custom_grp);
+	m0_sm_group_fini(&custom_grp);
+}
+
 
 struct m0_ut_suite ut_suite_mt_idx_dix = {
 	.ts_name   = "idx-dix-mt",
@@ -1059,6 +1314,9 @@ struct m0_ut_suite ut_suite_mt_idx_dix = {
 		{ "dtm0",           st_dtm0,          "Anatoliy" },
 		{ "dtm0_putdel",    st_dtm0_putdel,   "Ivan"     },
 		{ "dtm0_e_then_s",  st_dtm0_e_then_s, "Ivan"     },
+		{ "addb_probe",     st_addb_probe,    "Maxim"    },
+		{ "addb_layer",     st_addb_layer,    "Maxim"    },
+		{ "addb_relation",  st_addb_relation, "Maxim"    },
 		{ NULL, NULL }
 	}
 };

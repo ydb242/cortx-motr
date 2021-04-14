@@ -743,6 +743,10 @@ M0_INTERNAL bool m0__is_oostore(struct m0_client *instance);
 extern struct m0_sm_conf m0_op_conf;
 extern struct m0_sm_conf entity_conf;
 
+/* sm conf for custom sm */
+extern struct m0_sm_conf m0_custom_sm_conf;
+
+
 /* used by the entity code to create operations */
 M0_INTERNAL int m0_op_alloc(struct m0_op **op, size_t op_size);
 

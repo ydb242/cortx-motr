@@ -122,6 +122,17 @@ enum m0_addb2_value_id {
 	M0_AVI_DIX_RANGE_START     = 0xe000,
 	M0_AVI_KEM_RANGE_START     = 0xf000,
 
+	M0_AVI_CUSTOM_RANGE_START  = 0xf100,
+
+	M0_AVI_CUSTOM_PROBE1        = 0xf101,
+	M0_AVI_CUSTOM_PROBE2,
+
+	M0_AVI_CUSTOM_SM_STATE,
+	M0_AVI_CUSTOM_SM_COUNTER,
+	M0_AVI_CUSTOM_SM_COUNTER_END = M0_AVI_CUSTOM_SM_COUNTER + 0x100,
+
+	M0_AVI_CUSTOM_TO_CLIENT, 
+
 	/**
 	 * Ranges reserved for using in external projects (S3, NFS)
 	 * and m0addb2dump plugins
