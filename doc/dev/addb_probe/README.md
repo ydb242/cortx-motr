@@ -14,7 +14,7 @@
 
 7. Use-case: Parallel request execution
 
-8. 
+8. How to instrument without introducing new layer
 
 # Overview
 
@@ -719,7 +719,7 @@ sqlite> select * from relation where type_id='meta';
 4|-1|4|5982|meta
 ```
 
-And after execution of META relation, it can be plotted:
+And after addition of META relation, it can be plotted:
 ```
 $ python3 req_timelines.py -p 4 -1 -e 1 --db m0play.db.4
 ```
