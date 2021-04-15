@@ -51,7 +51,7 @@ Purpose of addb2 sub-system is to collect information about system behaviour.
 
 Seagate chronometry tools heavily rely on ADDB storage objects that are generated during Motr test or workload execution. System behavior can be visualized by creating sequential diagrams/timelines, drawing system queues, requests' states' histograms and so on.
 
-Assume we have a given system test and want to evaluate system behavior. The first step of system profiling is to plot timing diagrams. Moving from simple one-shot ADDB probes to complex layer and inter-layer relations, will help us to fix the given source code from sequential requests processing to parallel.
+Assume we have a given system test and want to evaluate system behavior. The first step to observe the system behaviour is to plot timing diagrams of the top-level request flow, or, client (former clovis) request flow. Moving from simple one-shot ADDB probes to complex layer and inter-layer relations, will help us to fix the given source code from sequential requests processing to parallel.
 
 Sequential execution:
 ![Sequential timeline](./sequential.png)
