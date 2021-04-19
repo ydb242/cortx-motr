@@ -38,6 +38,17 @@
 struct m0_rpc_item;
 struct m0_rpc_frm;
 
+extern struct m0_sm_conf rpc_packet_sm_conf;
+
+enum m0_rpc_packet_state {
+	M0_RPC_PACKET_UNINITIALISED,
+	M0_RPC_PACKET_INITIALISED,
+	M0_RPC_PACKET_DECODE,
+	M0_RPC_PACKET_PROCESS,
+	M0_RPC_PACKET_DONE,
+	M0_RPC_PACKET_NR_STATES,
+};
+
 /**
    RPC Packet (aka RPC) is a collection of RPC items that are sent together
    in same network buffer.
@@ -63,6 +74,12 @@ struct m0_rpc_packet {
 	struct m0_rpc_frm                 *rp_frm;
 
 	struct m0_rpc_machine             *rp_rmachine;
+
+	/**
+	    RPC packet state machine. Used for enhcanced ADDB instrumentation.
+	*/
+	struct m0_sm                       rp_sm;
+	struct m0_sm_group                 rp_sm_grp;
 };
 
 M0_INTERNAL m0_bcount_t m0_rpc_packet_onwire_header_size(void);
@@ -79,6 +96,8 @@ M0_TL_DECLARE(packet_item, M0_INTERNAL, struct m0_rpc_item);
 M0_INTERNAL bool m0_rpc_packet_invariant(const struct m0_rpc_packet *packet);
 M0_INTERNAL void m0_rpc_packet_init(struct m0_rpc_packet *packet,
 				    struct m0_rpc_machine *rmach);
+M0_INTERNAL void m0_rpc_packet_change_state(struct m0_rpc_packet *p,
+					    enum m0_rpc_packet_state state);
 M0_INTERNAL void m0_rpc_packet_fini(struct m0_rpc_packet *packet);
 
 /** Removes all items from the packet, finalises and frees it. */

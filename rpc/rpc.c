@@ -43,6 +43,11 @@
 M0_INTERNAL int m0_rpc_init(void)
 {
 	M0_ENTRY();
+
+	m0_sm_conf_init(&rpc_packet_sm_conf);
+	m0_sm_addb2_init(&rpc_packet_sm_conf, M0_AVI_RPC_PACKET_STATE,
+			 M0_AVI_RPC_PACKET_COUNTER);
+
 	return M0_RC(m0_rpc_item_module_init() ?:
 		     m0_rpc_service_register() ?:
 		     m0_rpc_session_module_init() ?:

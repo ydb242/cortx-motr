@@ -40,6 +40,7 @@
 #include "reqh/reqh.h"
 #include "rpc/addb2.h"
 #include "rpc/rpc_internal.h"
+#include "rpc/packet_internal.h"
 
 /* Forward declarations. */
 static void rpc_tm_cleanup(struct m0_rpc_machine *machine);
@@ -70,7 +71,9 @@ static void packet_received(struct m0_rpc_packet    *p,
 			    struct m0_rpc_machine   *machine,
 			    struct m0_net_end_point *from_ep);
 static void item_received(struct m0_rpc_item      *item,
-			  struct m0_net_end_point *from_ep);
+			  struct m0_net_end_point *from_ep,
+			  struct m0_rpc_packet    *pkt);
+
 static void net_buf_err(struct m0_net_buffer *nb, int32_t status);
 
 static const struct m0_bob_type rpc_machine_bob_type = {
@@ -791,12 +794,15 @@ static void net_buf_received(struct m0_net_buffer    *nb,
 
 	machine = tm_to_rpc_machine(nb->nb_tm);
 	m0_rpc_packet_init(&p, machine);
+	m0_rpc_packet_change_state(&p, M0_RPC_PACKET_DECODE);
 	rc = m0_rpc_packet_decode(&p, &nb->nb_buffer, offset, length);
 	if (rc != 0)
 		M0_LOG(M0_ERROR, "Packet decode error: %i.", rc);
 	/* There might be items in packet p, which were successfully decoded
 	   before an error occurred. */
+	m0_rpc_packet_change_state(&p, M0_RPC_PACKET_PROCESS);
 	packet_received(&p, machine, from_ep);
+	m0_rpc_packet_change_state(&p, M0_RPC_PACKET_DONE);
 	m0_rpc_packet_fini(&p);
 	M0_LEAVE();
 }
@@ -817,7 +823,7 @@ static void packet_received(struct m0_rpc_packet    *p,
 		m0_rpc_item_get(item);
 		m0_rpc_machine_lock(machine);
 		m0_rpc_packet_remove_item(p, item);
-		item_received(item, from_ep);
+		item_received(item, from_ep, p);
 		m0_rpc_item_put(item);
 		m0_rpc_machine_unlock(machine);
 	} end_for_each_item_in_packet;
@@ -861,8 +867,18 @@ m0_rpc_machine_find_conn(const struct m0_rpc_machine *machine,
 M0_INTERNAL void (*m0_rpc__item_dropped)(struct m0_rpc_item *item);
 static bool item_received_fi(struct m0_rpc_item *item);
 
+static void item_to_packet_map(struct m0_rpc_item   *item,
+			       struct m0_rpc_packet *p)
+{
+	uint64_t item_id = m0_sm_id_get(&item->ri_sm);
+	uint64_t packet_id = m0_sm_id_get(&p->rp_sm);
+
+	M0_ADDB2_ADD(M0_AVI_RPC_ITEM_TO_PACKET, item_id, packet_id);
+}
+
 static void item_received(struct m0_rpc_item      *item,
-			  struct m0_net_end_point *from_ep)
+			  struct m0_net_end_point *from_ep,
+			  struct m0_rpc_packet    *pkt)
 {
 	struct m0_rpc_machine *machine = item->ri_rmachine;
 	int                    rc;
@@ -882,6 +898,8 @@ static void item_received(struct m0_rpc_item      *item,
 	item->ri_rpc_time = m0_time_now();
 
 	m0_rpc_item_sm_init(item, M0_RPC_ITEM_INCOMING);
+	item_to_packet_map(item, pkt);
+
 	rc = m0_rpc_item_received(item, machine);
 	if (rc == 0) {
 		/* Duplicate request can be replied from the cache. */

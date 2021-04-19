@@ -100,6 +100,87 @@ M0_INTERNAL bool m0_rpc_packet_invariant(const struct m0_rpc_packet *p)
 				  m0_rpc_packet_onwire_footer_size());
 }
 
+static struct m0_sm_state_descr packet_states[] = {
+	[M0_RPC_PACKET_UNINITIALISED] = {
+		.sd_flags   = M0_SDF_TERMINAL,
+		.sd_name    = "UNINITIALISED",
+		.sd_allowed = 0,
+	},
+	[M0_RPC_PACKET_INITIALISED] = {
+		.sd_flags   = M0_SDF_INITIAL | M0_SDF_FINAL,
+		.sd_name    = "INITIALISED",
+		.sd_allowed = M0_BITS(M0_RPC_PACKET_DECODE),
+	},
+	[M0_RPC_PACKET_DECODE] = {
+		.sd_name    = "DECODE",
+		.sd_allowed = M0_BITS(M0_RPC_PACKET_PROCESS),
+	},
+	[M0_RPC_PACKET_PROCESS] = {
+		.sd_name    = "PROCESS",
+		.sd_allowed = M0_BITS(M0_RPC_PACKET_DONE),
+	},
+	[M0_RPC_PACKET_DONE] = {
+		.sd_flags   = M0_SDF_FINAL | M0_SDF_TERMINAL,
+		.sd_name    = "DONE",
+	},
+};
+
+static struct m0_sm_trans_descr packet_trans[] = {
+	{ "initialised", M0_RPC_PACKET_INITIALISED, M0_RPC_PACKET_DECODE  },
+	{ "decoded",     M0_RPC_PACKET_DECODE,      M0_RPC_PACKET_PROCESS },
+	{ "processed",   M0_RPC_PACKET_PROCESS,     M0_RPC_PACKET_DONE    },
+};
+
+struct m0_sm_conf rpc_packet_sm_conf = {
+	.scf_name      = "RPC-Packet-sm",
+	.scf_nr_states = ARRAY_SIZE(packet_states),
+	.scf_state     = packet_states,
+	.scf_trans_nr  = ARRAY_SIZE(packet_trans),
+	.scf_trans     = packet_trans
+};
+
+M0_INTERNAL void m0_rpc_packet_sm_init(struct m0_rpc_packet *p)
+{
+	M0_PRE(p != NULL && p->rp_rmachine != NULL);
+
+	M0_LOG(M0_DEBUG, "%p UNINITIALISED -> INITIALISED", p);
+	m0_sm_group_init(&p->rp_sm_grp);
+
+	m0_sm_group_lock(&p->rp_sm_grp);
+	m0_sm_init(&p->rp_sm, &rpc_packet_sm_conf, M0_RPC_PACKET_INITIALISED,
+		   &p->rp_sm_grp);
+	m0_sm_addb2_counter_init(&p->rp_sm);
+	m0_sm_group_unlock(&p->rp_sm_grp);
+}
+
+M0_INTERNAL void m0_rpc_packet_sm_fini(struct m0_rpc_packet *p)
+{
+	M0_PRE(p != NULL);
+
+	m0_sm_group_lock(&p->rp_sm_grp);
+	m0_sm_fini(&p->rp_sm);
+	p->rp_sm.sm_state = M0_RPC_PACKET_UNINITIALISED;
+	m0_sm_group_unlock(&p->rp_sm_grp);
+	m0_sm_group_fini(&p->rp_sm_grp);
+}
+
+M0_INTERNAL void m0_rpc_packet_change_state(struct m0_rpc_packet *p,
+					    enum m0_rpc_packet_state state)
+{
+	M0_PRE(p != NULL);
+
+	m0_sm_group_lock(&p->rp_sm_grp);
+
+	M0_LOG(M0_DEBUG, "%p %s -> %s sm=%s", p,
+	       m0_sm_state_name(&p->rp_sm, p->rp_sm.sm_state),
+	       m0_sm_state_name(&p->rp_sm, state),
+	       p->rp_sm.sm_conf->scf_name);
+
+	m0_sm_state_set(&p->rp_sm, state);
+
+	m0_sm_group_unlock(&p->rp_sm_grp);
+}
+
 M0_INTERNAL void m0_rpc_packet_init(struct m0_rpc_packet *p,
 				    struct m0_rpc_machine *rmach)
 {
@@ -114,6 +195,7 @@ M0_INTERNAL void m0_rpc_packet_init(struct m0_rpc_packet *p,
 		     m0_rpc_packet_onwire_footer_size();
 	packet_item_tlist_init(&p->rp_items);
 	p->rp_rmachine = rmach;
+	m0_rpc_packet_sm_init(p);
 
 	M0_ASSERT(m0_rpc_packet_invariant(p));
 	M0_LEAVE();
@@ -124,6 +206,9 @@ M0_INTERNAL void m0_rpc_packet_fini(struct m0_rpc_packet *p)
 	M0_ENTRY("packet: %p nr_items: %llu", p,
 		 (unsigned long long)p->rp_ow.poh_nr_items);
 	M0_PRE(m0_rpc_packet_invariant(p) && p->rp_ow.poh_nr_items == 0);
+
+	if (p->rp_sm.sm_state > M0_RPC_PACKET_UNINITIALISED)
+		m0_rpc_packet_sm_fini(p);
 
 	packet_item_tlist_fini(&p->rp_items);
 	M0_SET0(p);

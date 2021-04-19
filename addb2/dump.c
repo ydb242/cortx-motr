@@ -830,6 +830,18 @@ static void rpc_out(struct m0_addb2__context *ctx, const uint64_t *v, char *buf)
 	sm_state(&outgoing_item_sm_conf, ctx, v, buf);
 }
 
+extern struct m0_sm_conf rpc_packet_sm_conf;
+static void rpc_packet_state(struct m0_addb2__context *ctx, const uint64_t *v,
+			     char *buf)
+{
+	sm_state(&rpc_packet_sm_conf, ctx, v, buf);
+}
+
+static void rpc_packet_state_counter(struct m0_addb2__context *ctx, char *buf)
+{
+	sm_trans(&rpc_packet_sm_conf, "rpc_packet", ctx, buf);
+}
+
 extern struct m0_sm_conf be_tx_sm_conf;
 static void tx_state(struct m0_addb2__context *ctx, const uint64_t *v,
                      char *buf)
@@ -1125,6 +1137,13 @@ struct m0_addb2__id_intrp ids[] = {
 	  { &dec, &dec, &dec, &dec }, { "id", "opcode", "xid", "session_id" } },
 	{ M0_AVI_RPC_POST_REPLY_STATE, "rpc-post-reply-state",
 	  { &dec, &dec }, {"sm_id", "state"} },
+	{ M0_AVI_RPC_PACKET_STATE,     "rpc-packet",        { &rpc_packet_state, SKIP2  } },
+	{ M0_AVI_RPC_PACKET_COUNTER,   "",
+	  .ii_repeat = M0_AVI_RPC_PACKET_COUNTER_END - M0_AVI_RPC_PACKET_COUNTER,
+	  .ii_spec   = &rpc_packet_state_counter },
+	{ M0_AVI_RPC_ITEM_TO_PACKET,      "item-to-packet", { &dec, &dec },
+	  { "item_id", "packet_id" } },
+
 	{ M0_AVI_BE_TX_STATE,     "tx-state",        { &tx_state, SKIP2  } },
 	{ M0_AVI_BE_TX_COUNTER,   "",
 	  .ii_repeat = M0_AVI_BE_TX_COUNTER_END - M0_AVI_BE_TX_COUNTER,
