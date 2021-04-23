@@ -225,6 +225,7 @@ M0_INTERNAL bool nlx_core_buf_event_get(struct nlx_core_transfer_mc *lctm,
 	if (link != NULL) {
 		bev = container_of(link, struct nlx_core_buffer_event,
 				   cbe_tm_link);
+		bev->cbe_timestamp.nts_dequeued = m0_time_now();
 		*lcbe = *bev;
 		M0_SET0(&lcbe->cbe_tm_link); /* copy is not in queue */
 		/* Event structures released when network buffer unlinked */

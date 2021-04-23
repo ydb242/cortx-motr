@@ -403,6 +403,7 @@ M0_INTERNAL void m0_net_buffer_event_post(const struct m0_net_buffer_event *ev)
 	m0_mutex_unlock(&tm->ntm_mutex);
 	if (pool != NULL && !retain)
 		m0_net__tm_provision_recv_q(tm);
+	//ev->nbe_timestamp.nts_process = m0_time_now();
 	cb(ev);
 	M0_ADDB2_ADD(M0_AVI_NET_BUF, (uint64_t)buf, qtype,
 		     addtime, tdiff, ev->nbe_status, len);

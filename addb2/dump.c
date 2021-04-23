@@ -1143,6 +1143,12 @@ struct m0_addb2__id_intrp ids[] = {
 	  .ii_spec   = &rpc_packet_state_counter },
 	{ M0_AVI_RPC_ITEM_TO_PACKET,      "item-to-packet", { &dec, &dec },
 	  { "item_id", "packet_id" } },
+	{ M0_AVI_RPC_PACKET_TO_NETBUF,    "packet-to-netbuf", { &dec, &dec },
+	  { "packet_id", "netbuf_id" } },
+
+	{ M0_AVI_NET_TIMESTAMPS,    "net-timestamps", { &dec, &_clock, &_clock,
+							&_clock, &_clock },
+	  { "netbuf_id", "called", "enqueued", "dequeued", "post" } },
 
 	{ M0_AVI_BE_TX_STATE,     "tx-state",        { &tx_state, SKIP2  } },
 	{ M0_AVI_BE_TX_COUNTER,   "",

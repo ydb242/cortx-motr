@@ -90,6 +90,8 @@ struct m0_net_buffer_event;
 struct m0_net_buffer_callbacks;
 struct m0_net_qstats;
 
+struct m0_net_timestamps;
+
 /**
    Constructor for the network library
  */
@@ -782,6 +784,15 @@ struct m0_net_qstats {
 	uint64_t        nqs_max_bytes;
 };
 
+struct m0_net_timestamps {
+	m0_time_t nts_called;
+	m0_time_t nts_enqueued;
+	m0_time_t nts_dequeued;
+	m0_time_t nts_post;
+	/* m0_time_t nts_process; */
+	/* m0_time_t nts_processed; */
+};
+
 /**
    This data structure tracks message buffers and supports callbacks to notify
    the application of changes in state associated with these buffers.
@@ -1174,6 +1185,8 @@ struct m0_net_buffer_event {
 	/** Time the event is posted. */
 	m0_time_t                  nbe_time;
 
+	struct m0_net_timestamps   nbe_timestamp;
+	
 	/**
 	   Status or error code associated with the event.
 

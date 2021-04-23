@@ -208,6 +208,8 @@ struct nlx_core_buffer_event {
 	/** True if the buffer is no longer in use */
         bool                         cbe_unlinked;
 
+	struct m0_net_timestamps     cbe_timestamp;
+
 	/** Core kernel space private. */
 	void                        *cbe_kpvt;
 };

@@ -256,9 +256,10 @@ M0_INTERNAL int nlx_xo_core_bev_to_net_bev(struct m0_net_transfer_mc *tm,
 	M0_ASSERT(m0_net__buffer_invariant(nb));
 
 	M0_SET0(nbev);
-	nbev->nbe_buffer = nb;
-	nbev->nbe_status = lcbev->cbe_status;
-	nbev->nbe_time   = m0_time_add(lcbev->cbe_time, nb->nb_add_time);
+	nbev->nbe_buffer    = nb;
+	nbev->nbe_status    = lcbev->cbe_status;
+	nbev->nbe_time      = m0_time_add(lcbev->cbe_time, nb->nb_add_time);
+	nbev->nbe_timestamp = lcbev->cbe_timestamp;
 	if (!lcbev->cbe_unlinked)
 		nb->nb_flags |= M0_NET_BUF_RETAIN;
 	else

@@ -547,6 +547,7 @@ static void nlx_xo_bev_deliver_all(struct m0_net_transfer_mc *tm)
 		m0_mutex_unlock(&tm->ntm_mutex);
 
 		num_events++;
+		nbev.nbe_timestamp.nts_post = m0_time_now();
 		m0_net_buffer_event_post(&nbev);
 
 		/* re-enter the mutex */

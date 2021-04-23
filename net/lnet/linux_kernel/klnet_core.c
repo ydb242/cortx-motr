@@ -1097,6 +1097,8 @@ static void nlx_kcore_eq_cb(lnet_event_t *event)
 	bev->cbe_length    = mlength;
 	bev->cbe_offset    = offset;
 	bev->cbe_unlinked  = is_unlinked;
+	bev->cbe_timestamp.nts_called = now;
+	bev->cbe_timestamp.nts_enqueued = m0_time_now();
 	if (event->hdr_data != 0) {
 		bev->cbe_sender.cepa_nid = event->initiator.nid;
 		bev->cbe_sender.cepa_pid = event->initiator.pid;

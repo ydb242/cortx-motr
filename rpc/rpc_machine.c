@@ -36,6 +36,7 @@
 #include "motr/magic.h"
 #include "cob/cob.h"
 #include "net/net.h"
+#include "net/addb2.h"
 #include "net/buffer_pool.h"   /* m0_net_buffer_pool_[lock|unlock] */
 #include "reqh/reqh.h"
 #include "rpc/addb2.h"
@@ -63,10 +64,11 @@ static int rpc_chan_create(struct m0_rpc_chan **chan,
 static void rpc_chan_ref_release(struct m0_ref *ref);
 static void rpc_recv_pool_buffer_put(struct m0_net_buffer *nb);
 static void buf_recv_cb(const struct m0_net_buffer_event *ev);
-static void net_buf_received(struct m0_net_buffer    *nb,
-			     m0_bindex_t              offset,
-			     m0_bcount_t              length,
-			     struct m0_net_end_point *from_ep);
+static void net_buf_received(struct m0_net_buffer           *nb,
+			     m0_bindex_t                     offset,
+			     m0_bcount_t                     length,
+			     struct m0_net_end_point        *from_ep,
+     			     const struct m0_net_timestamps *tms);
 static void packet_received(struct m0_rpc_packet    *p,
 			    struct m0_rpc_machine   *machine,
 			    struct m0_net_end_point *from_ep);
@@ -768,7 +770,7 @@ static void buf_recv_cb(const struct m0_net_buffer_event *ev)
 
 	if (ev->nbe_status == 0) {
 		net_buf_received(nb, ev->nbe_offset, ev->nbe_length,
-				 ev->nbe_ep);
+				 ev->nbe_ep, &ev->nbe_timestamp);
 	} else {
 		if (ev->nbe_status != -ECANCELED)
 			net_buf_err(nb, ev->nbe_status);
@@ -779,21 +781,41 @@ static void buf_recv_cb(const struct m0_net_buffer_event *ev)
 	M0_LEAVE();
 }
 
-static void net_buf_received(struct m0_net_buffer    *nb,
-			     m0_bindex_t              offset,
-			     m0_bcount_t              length,
-			     struct m0_net_end_point *from_ep)
+static void packet_to_netbuf_map(struct m0_rpc_packet *p,
+				 uint64_t              buf_id)
+{
+	uint64_t packet_id = m0_sm_id_get(&p->rp_sm);
+
+	M0_ADDB2_ADD(M0_AVI_RPC_PACKET_TO_NETBUF, packet_id, buf_id);
+}
+
+static void dump_timestamps(uint64_t                        buf_id,
+			    const struct m0_net_timestamps *tms)
+{
+	M0_ADDB2_ADD(M0_AVI_NET_TIMESTAMPS, buf_id,
+		     tms->nts_called, tms->nts_enqueued,
+		     tms->nts_dequeued, tms->nts_post);
+}
+
+static void net_buf_received(struct m0_net_buffer           *nb,
+			     m0_bindex_t                     offset,
+			     m0_bcount_t                     length,
+			     struct m0_net_end_point        *from_ep,
+			     const struct m0_net_timestamps *tms)
 {
 	struct m0_rpc_machine *machine;
 	struct m0_rpc_packet   p;
 	int                    rc;
+	uint64_t               buf_id;
 
 	M0_ENTRY("net_buf: %p, offset: %llu, length: %llu,"
 		 "ep_addr: %s", nb, (unsigned long long)offset,
 		 (unsigned long long)length, (char *)from_ep->nep_addr);
 
+	buf_id = m0_dummy_id_generate();
 	machine = tm_to_rpc_machine(nb->nb_tm);
 	m0_rpc_packet_init(&p, machine);
+	packet_to_netbuf_map(&p, buf_id);
 	m0_rpc_packet_change_state(&p, M0_RPC_PACKET_DECODE);
 	rc = m0_rpc_packet_decode(&p, &nb->nb_buffer, offset, length);
 	if (rc != 0)
@@ -804,6 +826,9 @@ static void net_buf_received(struct m0_net_buffer    *nb,
 	packet_received(&p, machine, from_ep);
 	m0_rpc_packet_change_state(&p, M0_RPC_PACKET_DONE);
 	m0_rpc_packet_fini(&p);
+
+	dump_timestamps(buf_id, tms);
+	
 	M0_LEAVE();
 }
 
