@@ -193,6 +193,8 @@ struct nlx_core_buffer_event {
 	/** Event timestamp, relative to the buffer add time */
 	m0_time_t                    cbe_time;
 
+	struct m0_net_timestamps     cbe_timestamp;
+
 	/** Status code (-errno). 0 is success */
 	int32_t                      cbe_status;
 
@@ -207,8 +209,6 @@ struct nlx_core_buffer_event {
 
 	/** True if the buffer is no longer in use */
         bool                         cbe_unlinked;
-
-	struct m0_net_timestamps     cbe_timestamp;
 
 	/** Core kernel space private. */
 	void                        *cbe_kpvt;
