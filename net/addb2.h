@@ -36,6 +36,7 @@
 enum {
 	M0_AVI_NET_BUF = M0_AVI_NET_RANGE_START + 1,
 	M0_AVI_NET_TIMESTAMPS,
+	M0_AVI_NET_TIMESTAMPS_EX,
 };
 
 /** @} end of stob group */

@@ -1098,7 +1098,6 @@ static void nlx_kcore_eq_cb(lnet_event_t *event)
 	bev->cbe_offset    = offset;
 	bev->cbe_unlinked  = is_unlinked;
 	bev->cbe_timestamp.nts_called = now;
-	bev->cbe_timestamp.nts_enqueued = m0_time_now();
 	if (event->hdr_data != 0) {
 		bev->cbe_sender.cepa_nid = event->initiator.nid;
 		bev->cbe_sender.cepa_pid = event->initiator.pid;
@@ -1111,6 +1110,7 @@ static void nlx_kcore_eq_cb(lnet_event_t *event)
 	/* Reset in spinlock to synchronize with driver nlx_dev_tm_cleanup() */
 	if (is_unlinked)
 		kbp->kb_ktm = NULL;
+	bev->cbe_timestamp.nts_enqueued = m0_time_now();
 	bev_cqueue_put(&ctm->ctm_bevq, ql);
 	nlx_kcore_core_tm_unmap_atomic(ctm);
 	spin_unlock(&ktm->ktm_bevq_lock);

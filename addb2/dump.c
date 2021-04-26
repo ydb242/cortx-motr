@@ -1150,6 +1150,10 @@ struct m0_addb2__id_intrp ids[] = {
 							&_clock, &_clock },
 	  { "netbuf_id", "called", "enqueued", "dequeued", "post" } },
 
+	{ M0_AVI_NET_TIMESTAMPS_EX, "net-time-ex", { &dec, &_clock, &_clock,
+							&_clock, &_clock },
+	  { "netbuf_id", "called", "enqueued", "dequeued", "post" } },
+
 	{ M0_AVI_BE_TX_STATE,     "tx-state",        { &tx_state, SKIP2  } },
 	{ M0_AVI_BE_TX_COUNTER,   "",
 	  .ii_repeat = M0_AVI_BE_TX_COUNTER_END - M0_AVI_BE_TX_COUNTER,

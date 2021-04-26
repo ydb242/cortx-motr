@@ -25,6 +25,8 @@
    @{
  */
 
+#include "net/addb2.h"
+
 static bool nlx_dom_invariant(const struct m0_net_domain *dom)
 {
 	const struct nlx_xo_domain *dp = dom->nd_xprt_private;
@@ -492,6 +494,13 @@ static void nlx_xo_bev_deliver_all(struct m0_net_transfer_mc *tm)
 		int rc;
 
 		rc = nlx_xo_core_bev_to_net_bev(tm, &cbev, &nbev);
+
+		M0_ADDB2_ADD(M0_AVI_NET_TIMESTAMPS_EX, 0,
+			     nbev.nbe_timestamp.nts_called,
+			     nbev.nbe_timestamp.nts_enqueued,
+			     nbev.nbe_timestamp.nts_dequeued,
+			     nbev.nbe_timestamp.nts_post);
+
 		if (rc != 0) {
 			/* Failure can only happen for receive message events
 			   when end point creation fails due to lack

@@ -401,6 +401,13 @@ M0_INTERNAL void m0_net_buffer_event_post(const struct m0_net_buffer_event *ev)
 	M0_CNT_INC(tm->ntm_callback_counter);
 	buf->nb_flags = flags;
 	m0_mutex_unlock(&tm->ntm_mutex);
+
+	M0_ADDB2_ADD(M0_AVI_NET_TIMESTAMPS_EX, -1,
+		     ev->nbe_timestamp.nts_called,
+		     ev->nbe_timestamp.nts_enqueued,
+		     ev->nbe_timestamp.nts_dequeued,
+		     ev->nbe_timestamp.nts_post);
+	
 	if (pool != NULL && !retain)
 		m0_net__tm_provision_recv_q(tm);
 	//ev->nbe_timestamp.nts_process = m0_time_now();
