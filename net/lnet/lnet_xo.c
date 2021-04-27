@@ -478,7 +478,8 @@ static int nlx_xo_tm_confine(struct m0_net_transfer_mc *tm,
 	return M0_RC(rc);
 }
 
-static void nlx_xo_bev_deliver_all(struct m0_net_transfer_mc *tm)
+static void nlx_xo_bev_deliver_all(struct m0_net_transfer_mc *tm,
+				   uint64_t                   cycle_id)
 {
 	struct nlx_xo_transfer_mc *tp = tm->ntm_xprt_private;
 	struct nlx_core_buffer_event cbev;
@@ -495,11 +496,8 @@ static void nlx_xo_bev_deliver_all(struct m0_net_transfer_mc *tm)
 
 		rc = nlx_xo_core_bev_to_net_bev(tm, &cbev, &nbev);
 
-		M0_ADDB2_ADD(M0_AVI_NET_TIMESTAMPS_EX, 0,
-			     nbev.nbe_timestamp.nts_called,
-			     nbev.nbe_timestamp.nts_enqueued,
-			     nbev.nbe_timestamp.nts_dequeued,
-			     nbev.nbe_timestamp.nts_post);
+		M0_ADDB2_ADD(M0_AVI_NET_BUF_TO_CYCLE, nbev.nbe_id,
+			     cycle_id);
 
 		if (rc != 0) {
 			/* Failure can only happen for receive message events
@@ -563,6 +561,17 @@ static void nlx_xo_bev_deliver_all(struct m0_net_transfer_mc *tm)
 		m0_mutex_lock(&tm->ntm_mutex);
 		tm->ntm_callback_counter--;
 
+		nbev.nbe_timestamp.nts_done = m0_time_now();
+
+		M0_ADDB2_ADD(M0_AVI_NET_BUF_TIMESTAMPS, 
+			     nbev.nbe_id,
+			     nbev.nbe_timestamp.nts_dequeued, 
+			     nbev.nbe_timestamp.nts_post,
+			     nbev.nbe_timestamp.nts_done);
+
+		M0_ADDB2_ADD(M0_AVI_NET_BUF_TO_CYCLE, 
+			     nbev.nbe_id, cycle_id);
+		
 		M0_ASSERT(tm->ntm_state == M0_NET_TM_STARTED ||
 			  tm->ntm_state == M0_NET_TM_STOPPING);
 	}

@@ -400,7 +400,7 @@ M0_INTERNAL void m0_net_buffer_event_deliver_all(struct m0_net_transfer_mc *tm)
 	M0_PRE(m0_net__tm_invariant(tm));
 	M0_PRE(tm->ntm_state == M0_NET_TM_STARTED);
 	M0_PRE(!tm->ntm_bev_auto_deliver);
-	tm->ntm_dom->nd_xprt->nx_ops->xo_bev_deliver_all(tm);
+	tm->ntm_dom->nd_xprt->nx_ops->xo_bev_deliver_all(tm, 0);
 	M0_POST(m0_net__tm_invariant(tm));
 	m0_mutex_unlock(&tm->ntm_mutex);
 }

@@ -1001,7 +1001,7 @@ static void buf_deregister(struct m0_net_buffer *nb);
 static int  buf_add(struct m0_net_buffer *nb);
 static void buf_del(struct m0_net_buffer *nb);
 static int  bev_deliver_sync(struct m0_net_transfer_mc *ma);
-static void bev_deliver_all(struct m0_net_transfer_mc *ma);
+static void bev_deliver_all(struct m0_net_transfer_mc *ma, uint64_t dummy);
 static bool bev_pending(struct m0_net_transfer_mc *ma);
 static void bev_notify(struct m0_net_transfer_mc *ma, struct m0_chan *chan);
 static m0_bcount_t get_max_buffer_size(const struct m0_net_domain *dom);
@@ -1868,7 +1868,8 @@ static int bev_deliver_sync(struct m0_net_transfer_mc *ma)
 	return 0;
 }
 
-static void bev_deliver_all(struct m0_net_transfer_mc *ma)
+static void bev_deliver_all(struct m0_net_transfer_mc *ma,
+			    uint64_t                   dummy)
 {
 }
 

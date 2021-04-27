@@ -304,7 +304,8 @@ struct m0_net_xprt_ops {
 	   machine mutex, the transport should protect the invocation of this
 	   subroutine from synchronous termination of the transfer machine.
 	 */
-	void (*xo_bev_deliver_all)(struct m0_net_transfer_mc *tm);
+	void (*xo_bev_deliver_all)(struct m0_net_transfer_mc *tm, 
+				   uint64_t                   cycle_id);
 
 	/**
 	   Returns true, iff there are pending events.
@@ -789,8 +790,7 @@ struct m0_net_timestamps {
 	m0_time_t nts_enqueued;
 	m0_time_t nts_dequeued;
 	m0_time_t nts_post;
-	/* m0_time_t nts_process; */
-	/* m0_time_t nts_processed; */
+	m0_time_t nts_done;
 };
 
 /**
@@ -1186,6 +1186,8 @@ struct m0_net_buffer_event {
 	m0_time_t                  nbe_time;
 
 	struct m0_net_timestamps   nbe_timestamp;
+
+	uint64_t                   nbe_id;
 	
 	/**
 	   Status or error code associated with the event.

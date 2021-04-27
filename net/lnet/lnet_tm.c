@@ -101,6 +101,12 @@ static void nlx_tm_ev_worker(struct m0_net_transfer_mc *tm)
 	m0_time_t                    next_buffer_timeout;
 	m0_time_t                    buffer_timeout_tick;
 	m0_time_t                    now;
+	m0_time_t                    get_ready;
+	m0_time_t                    wait_event;
+	m0_time_t                    deliver;
+	m0_time_t                    done;
+	uint64_t                     cycle_id;
+        uint64_t                     iteration;
 	int                          rc = 0;
 
 	m0_mutex_lock(&tm->ntm_mutex);
@@ -152,6 +158,9 @@ static void nlx_tm_ev_worker(struct m0_net_transfer_mc *tm)
 
 	NLXDBGP(tp, 1, "%p: tm_worker_thread started\n", tp);
 
+	get_ready = m0_time_now();
+	iteration = 0;
+	cycle_id = m0_dummy_id_generate();
 	while (1) {
 		/* Compute next timeout (short if automatic or stopping).
 		   Upper bound constrained by the next stat schedule time.
@@ -167,11 +176,18 @@ static void nlx_tm_ev_worker(struct m0_net_transfer_mc *tm)
 			timeout = next_buffer_timeout;
 
 		if (tm->ntm_bev_auto_deliver) {
+			wait_event = m0_time_now();
 			rc = NLX_core_buf_event_wait(cd, ctp, timeout);
 			/* buffer event processing */
 			if (rc == 0) { /* did not time out - events pending */
 				m0_mutex_lock(&tm->ntm_mutex);
-				nlx_xo_bev_deliver_all(tm);
+				deliver = m0_time_now();
+				nlx_xo_bev_deliver_all(tm, cycle_id);
+				done = m0_time_now();
+
+				M0_ADDB2_ADD(M0_AVI_NET_CYCLE, cycle_id, 
+					     get_ready, wait_event, 
+					     deliver, done);
 				m0_mutex_unlock(&tm->ntm_mutex);
 			}
 		} else {		/* application initiated delivery */
@@ -194,6 +210,10 @@ static void nlx_tm_ev_worker(struct m0_net_transfer_mc *tm)
 			}
 			m0_mutex_unlock(&tm->ntm_mutex);
 		}
+
+		cycle_id = m0_dummy_id_generate();
+		get_ready = m0_time_now();
+		iteration++;
 
 		/* periodically record statistics and time out buffers */
 		now = m0_time_now();
@@ -260,6 +280,7 @@ M0_INTERNAL int nlx_xo_core_bev_to_net_bev(struct m0_net_transfer_mc *tm,
 	nbev->nbe_status    = lcbev->cbe_status;
 	nbev->nbe_time      = m0_time_add(lcbev->cbe_time, nb->nb_add_time);
 	nbev->nbe_timestamp = lcbev->cbe_timestamp;
+	nbev->nbe_id        = m0_dummy_id_generate();
 	if (!lcbev->cbe_unlinked)
 		nb->nb_flags |= M0_NET_BUF_RETAIN;
 	else

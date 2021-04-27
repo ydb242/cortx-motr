@@ -399,7 +399,7 @@ static int ut_bev_deliver_sync(struct m0_net_transfer_mc *tm)
 	return 0;
 }
 
-static void ut_bev_deliver_all(struct m0_net_transfer_mc *tm)
+static void ut_bev_deliver_all(struct m0_net_transfer_mc *tm, uint64_t dummy)
 {
 	M0_UT_ASSERT(m0_mutex_is_locked(&tm->ntm_mutex));
 	ut_bev_deliver_all_called = true;
