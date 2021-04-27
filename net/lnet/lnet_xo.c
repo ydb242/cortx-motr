@@ -565,6 +565,8 @@ static void nlx_xo_bev_deliver_all(struct m0_net_transfer_mc *tm,
 
 		M0_ADDB2_ADD(M0_AVI_NET_BUF_TIMESTAMPS, 
 			     nbev.nbe_id,
+			     nbev.nbe_timestamp.nts_called,
+			     nbev.nbe_timestamp.nts_enqueued, 
 			     nbev.nbe_timestamp.nts_dequeued, 
 			     nbev.nbe_timestamp.nts_post,
 			     nbev.nbe_timestamp.nts_done);
