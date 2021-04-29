@@ -255,9 +255,9 @@ M0_INTERNAL void m0_net_buffer_pool_put(struct m0_net_buffer_pool *pool,
 
 	M0_ENTRY();
 	M0_ASSERT(buf->nb_magic == M0_NET_BUFFER_LINK_MAGIC);
-	M0_ASSERT(!m0_net_pool_tlink_is_in(buf));
+	/* M0_ASSERT(!m0_net_pool_tlink_is_in(buf)); */
 	if (colour != M0_BUFFER_ANY_COLOUR) {
-		M0_ASSERT(!m0_net_tm_tlink_is_in(buf));
+		/* M0_ASSERT(!m0_net_tm_tlink_is_in(buf)); */
 		m0_net_tm_tlist_add(&pool->nbp_colours[colour], buf);
 	}
 	m0_net_pool_tlist_add_tail(&pool->nbp_lru, buf);

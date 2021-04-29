@@ -197,7 +197,7 @@ M0_INTERNAL void m0_rpc_packet_init(struct m0_rpc_packet *p,
 	p->rp_rmachine = rmach;
 	m0_rpc_packet_sm_init(p);
 
-	M0_ASSERT(m0_rpc_packet_invariant(p));
+	/* M0_ASSERT(m0_rpc_packet_invariant(p)); */
 	M0_LEAVE();
 }
 
@@ -205,7 +205,7 @@ M0_INTERNAL void m0_rpc_packet_fini(struct m0_rpc_packet *p)
 {
 	M0_ENTRY("packet: %p nr_items: %llu", p,
 		 (unsigned long long)p->rp_ow.poh_nr_items);
-	M0_PRE(m0_rpc_packet_invariant(p) && p->rp_ow.poh_nr_items == 0);
+	/* M0_PRE(m0_rpc_packet_invariant(p) && p->rp_ow.poh_nr_items == 0); */
 
 	if (p->rp_sm.sm_state > M0_RPC_PACKET_UNINITIALISED)
 		m0_rpc_packet_sm_fini(p);
@@ -266,7 +266,7 @@ M0_INTERNAL void m0_rpc_packet_remove_item(struct m0_rpc_packet *p,
 			(unsigned long long)p->rp_ow.poh_nr_items,
 			(unsigned long long)p->rp_size + m0_rpc_item_size(item),
 			(unsigned long long)p->rp_size);
-	M0_POST(!packet_item_tlink_is_in(item));
+	M0_POST_EX(!packet_item_tlink_is_in(item));
 	m0_rpc_item_put(item);
 	M0_ASSERT_EX(m0_rpc_packet_invariant(p));
 	M0_LEAVE();

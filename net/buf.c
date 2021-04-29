@@ -315,7 +315,7 @@ M0_INTERNAL void m0_net_buffer_event_post(const struct m0_net_buffer_event *ev)
 {
 	struct m0_net_buffer      *buf = NULL;
 	struct m0_net_end_point   *ep;
-	bool                       check_ep;
+	/* bool                       check_ep; */
 	bool                       retain;
 	enum m0_net_queue_type	   qtype = M0_NET_QT_NR;
 	struct m0_net_transfer_mc *tm;
@@ -374,11 +374,11 @@ M0_INTERNAL void m0_net_buffer_event_post(const struct m0_net_buffer_event *ev)
 	q->nqs_max_bytes = max_check(q->nqs_max_bytes, len);
 
 	ep = NULL;
-	check_ep = false;
+	/* check_ep = false; */
 	switch (qtype) {
 	case M0_NET_QT_MSG_RECV:
 		if (ev->nbe_status == 0) {
-			check_ep = true;
+			/* check_ep = true; */
 			ep = ev->nbe_ep; /* from event */
 			++buf->nb_msgs_received;
 		}
@@ -394,9 +394,12 @@ M0_INTERNAL void m0_net_buffer_event_post(const struct m0_net_buffer_event *ev)
 		break;
 	}
 
+	/* Maxim: Disable as expensive */
+#if 0
 	if (check_ep) {
 		M0_ASSERT(m0_net__ep_invariant(ep, tm, true));
 	}
+#endif
 	cb = buf->nb_callbacks->nbc_cb[qtype];
 	M0_CNT_INC(tm->ntm_callback_counter);
 	buf->nb_flags = flags;

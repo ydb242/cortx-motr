@@ -451,7 +451,7 @@ static void tm_provision_recv_q(struct m0_net_transfer_mc *tm)
 	uint64_t		   prev_deficit;
 
 	M0_PRE(m0_mutex_is_locked(&tm->ntm_mutex));
-	M0_PRE(m0_net__tm_invariant(tm));
+	M0_PRE_EX(m0_net__tm_invariant(tm));
 	if (tm->ntm_state != M0_NET_TM_STARTED || tm->ntm_recv_pool == NULL)
 		return; /* provisioning not required */
 	M0_PRE(m0_net_buffer_pool_is_locked(tm->ntm_recv_pool));
