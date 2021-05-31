@@ -130,6 +130,25 @@ static struct m0_rwlock *emap_rwlock(struct m0_be_emap *emap)
 	return &emap->em_lock.bl_u.rwlock;
 }
 
+static void key_print(const struct m0_be_emap_key *k)
+{
+	M0_LOG(M0_DEBUG, U128X_F " YJC offset= %"PRIu64" ", U128_P(&k->ek_prefix), k->ek_offset);
+	//M0_LOG(M0_DEBUG, "YJC: "U128X_F":" "PRIu64", U128_P(&k->ek_prefix), k->ek_offset);
+}
+
+static void rec_print(const struct m0_be_emap_rec *r)
+{
+        M0_LOG(M0_DEBUG, "YJC: start=%"PRIu64" "  "er_value=%"PRIu64,
+			 r->er_start, r->er_value);
+}
+
+static void extent_print(const struct m0_ext *e)
+{
+        M0_LOG(M0_DEBUG, "YJC: start=%"PRIu64" "  "end=%"PRIu64,
+			 e->e_start, e->e_end);
+}
+
+
 static void emap_dump(struct m0_be_emap_cursor *it)
 {
 	int                       i;
@@ -668,12 +687,16 @@ M0_INTERNAL void m0_be_emap_obj_insert(struct m0_be_emap *map,
 	m0_rwlock_write_lock(emap_rwlock(map));
 	map->em_key.ek_prefix = *prefix;
 	map->em_key.ek_offset = M0_BINDEX_MAX + 1;
+	key_print(&map->em_key);
 	m0_format_footer_update(&map->em_key);
 	map->em_rec.er_start = 0;
 	map->em_rec.er_value = val;
+	rec_print(&map->em_rec);
 	m0_format_footer_update(&map->em_rec);
 
 	++map->em_version;
+	M0_LOG(M0_DEBUG, "Nob: key = %"PRIu64" val = %"PRIu64" ",
+			 map->em_key_buf.b_nob, map->em_val_buf.b_nob );
 	op->bo_u.u_emap.e_rc = M0_BE_OP_SYNC_RET(
 		local_op,
 		m0_be_btree_insert(&map->em_mapping, tx, &local_op,
@@ -878,8 +901,10 @@ emap_it_pack(struct m0_be_emap_cursor *it,
 	key->ek_prefix = ext->ee_pre;
 	key->ek_offset = ext->ee_ext.e_end;
 	m0_format_footer_update(key);
+	key_print(key);
 	rec->er_start  = ext->ee_ext.e_start;
 	rec->er_value  = ext->ee_val;
+	rec_print(rec);
 	m0_format_footer_update(rec);
 	++it->ec_map->em_version;
 	it->ec_op.bo_u.u_emap.e_rc = M0_BE_OP_SYNC_RET(
@@ -946,6 +971,7 @@ static void emap_it_init(struct m0_be_emap_cursor *it,
 	it->ec_map = map;
 	it->ec_version = map->em_version;
 	m0_be_btree_cursor_init(&it->ec_cursor, &map->em_mapping);
+	key_print(&it->ec_key);
 }
 
 static void be_emap_close(struct m0_be_emap_cursor *it)
@@ -1112,6 +1138,8 @@ be_emap_split(struct m0_be_emap_cursor *it,
 	m0_bindex_t seg_end = it->ec_seg.ee_ext.e_end;
 	uint32_t    i;
 
+	M0_LOG(M0_DEBUG, "YJC end = %"PRIu64"", seg_end);
+
 	for (i = 0; i < vec->iv_vec.v_nr; ++i) {
 		count = vec->iv_vec.v_count[i];
 		if (count == 0)
@@ -1120,6 +1148,7 @@ be_emap_split(struct m0_be_emap_cursor *it,
 		it->ec_seg.ee_ext.e_start = scan;
 		it->ec_seg.ee_ext.e_end   = scan + count;
 		it->ec_seg.ee_val         = vec->iv_index[i];
+		extent_print(&it->ec_seg.ee_ext);
 		if (it->ec_seg.ee_ext.e_end == seg_end)
 			/* The end of original segment is reached:
 			 * just update it instead of deleting and
@@ -1144,6 +1173,8 @@ be_emap_split(struct m0_be_emap_cursor *it,
 		it->ec_key.ek_offset = last_end;
 		m0_format_footer_update(&it->ec_key);
 	}
+
+	m0_vec_print(&vec->iv_vec);
 
 	if (rc == 0)
 		/* Re-initialize cursor position. */

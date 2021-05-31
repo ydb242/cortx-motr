@@ -96,7 +96,7 @@ static int rpc_bulk_buf_init(struct m0_rpc_bulk_buf *rbuf, uint32_t segs_nr,
 	struct m0_buf cbuf;
 	m0_bindex_t   index = 0;
 
-	M0_ENTRY("bulk_buf: %p, net_buf: %p", rbuf, nb);
+	M0_ENTRY("YJC: bulk_buf: %p, net_buf: %p seg_nr = %d", rbuf, nb, segs_nr);
 	M0_PRE(rbuf != NULL);
 	M0_PRE(segs_nr > 0);
 
@@ -297,7 +297,7 @@ M0_INTERNAL int m0_rpc_bulk_buf_add(struct m0_rpc_bulk *rbulk,
 	int			rc;
 	struct m0_rpc_bulk_buf *buf;
 
-	M0_ENTRY("rbulk: %p, net_dom: %p, net_buf: %p", rbulk, netdom, nb);
+	M0_ENTRY("YJC: rbulk: %p, net_dom: %p, net_buf: %p", rbulk, netdom, nb);
 	M0_PRE(rbulk != NULL);
 	M0_PRE(netdom != NULL);
 	M0_PRE(out != NULL);

@@ -66,6 +66,16 @@ M0_INTERNAL bool m0_vec_is_empty(const struct m0_vec *vec)
 	return true;
 }
 
+M0_INTERNAL bool m0_vec_print(const struct m0_vec *vec)
+{
+	uint32_t i;
+
+	for (i = 0; i < vec->v_nr; ++i)
+		if (vec->v_count[i] > 0)
+			M0_LOG(M0_DEBUG, "YJC count %d %"PRIu64"", i, vec->v_count[i]);
+	return true;
+}
+
 static bool m0_vec_cursor_invariant(const struct m0_vec_cursor *cur)
 {
 	return

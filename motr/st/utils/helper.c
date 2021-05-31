@@ -115,13 +115,28 @@ static int alloc_vecs(struct m0_indexvec *ext, struct m0_bufvec *data,
 		m0_indexvec_free(ext);
 		return rc;
 	}
-	rc = m0_bufvec_alloc(attr, block_count, 1);
+	rc = m0_bufvec_alloc(attr, 1, 32);
 	if (rc != 0) {
 		m0_indexvec_free(ext);
 		m0_bufvec_free(data);
 		return rc;
 	}
 	return rc;
+}
+
+static int write_dummy_hash_data(struct m0_bufvec *attr)
+{
+       int i;
+       int nr_blocks;
+
+       nr_blocks = attr->ov_vec.v_nr;
+
+       for (i = 0; i < nr_blocks; ++i) {
+	       //snprintf((char *)attr->ov_buf[i], "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 31);
+	       snprintf(attr->ov_buf[i], 30, "%s", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+               //memcpy(attr->ov_buf[i], "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 32);
+       }
+       return i;
 }
 
 static void prepare_ext_vecs(struct m0_indexvec *ext,
@@ -137,7 +152,7 @@ static void prepare_ext_vecs(struct m0_indexvec *ext,
 		*last_index += block_size;
 
 		/* we don't want any attributes */
-		attr->ov_vec.v_count[i] = 0;
+		attr->ov_vec.v_count[i] = 32;
 	}
 }
 
@@ -429,6 +444,9 @@ int m0_write(struct m0_container *container, char *src,
 		/* Read data from source file. */
 		rc = read_data_from_file(fp, &data);
 		M0_ASSERT(rc == bcount);
+		fprintf(stderr, "YJC: writing dummy hash bcount = %d\n",
+		        bcount);
+		write_dummy_hash_data(&attr);
 
 		/* Copy data to the object*/
 		rc = write_data_to_object(&obj, &ext, &data, &attr);

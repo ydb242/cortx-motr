@@ -32,6 +32,8 @@
 #include "rpc/rpclib.h"          /* m0_rpc_client_connect */
 #include "lib/ext.h"             /* struct m0_ext */
 #include "lib/misc.h"            /* M0_KEY_VAL_NULL */
+#include "lib/vec.h"
+#include "lib/vec_xc.h"
 
 #define M0_TRACE_SUBSYSTEM M0_TRACE_SUBSYS_CLIENT
 #include "lib/trace.h"           /* M0_LOG */
@@ -136,7 +138,6 @@ static struct m0_sm_trans_descr ioo_trans[] = {
 	{ "failed-complete", IRS_FAILED, IRS_REQ_COMPLETE             },
 };
 
-/** IO request state machine config */
 struct m0_sm_conf io_sm_conf = {
 	.scf_name      = "IO request state machine configuration",
 	.scf_nr_states = ARRAY_SIZE(io_states),
@@ -175,6 +176,17 @@ static bool is_pver_dud(uint32_t fdev_nr, uint32_t dev_k, uint32_t fsvc_nr,
 		(fdev_nr * svc_k + fsvc_nr * dev_k) > dev_k * svc_k :
 		fdev_nr > dev_k);
 }
+
+
+#define GET_CUR_ADDR_BUFVEC(_datacur)
+/*
+#define GET_CUR_ADDR_BUFVEC(_datacur) do { \
+void *addr = m0_bufvec_cursor_addr(_datacur); \
+M0_LOG(M0_DEBUG, "YJC: cursor address = %p", addr); \
+}while(0)
+*/
+
+/** IO request state machine config */
 
 /**
  * This is heavily based on m0t1fs/linux_kernel/file.c::ioreq_sm_state_set
@@ -310,7 +322,6 @@ static void ioreq_iosm_handle_launch(struct m0_sm_group *grp,
 	struct m0_op_io          *ioo;
 	struct m0_pdclust_layout *play;
 
-	M0_ENTRY();
 
 	M0_PRE(grp != NULL);
 	M0_PRE(m0_sm_group_is_locked(grp));
@@ -319,6 +330,7 @@ static void ioreq_iosm_handle_launch(struct m0_sm_group *grp,
 	M0_PRE_EX(m0_op_io_invariant(ioo));
 	op = &ioo->ioo_oo.oo_oc.oc_op;
 	play = pdlayout_get(ioo);
+	M0_ENTRY("YJC: obj_id: " U128X_F, U128_P(&ioo->ioo_obj->ob_entity.en_id));
 
 	/* @todo Do error handling based on m0_sm::sm_rc. */
 	/*
@@ -400,7 +412,7 @@ static void ioreq_iosm_handle_launch(struct m0_sm_group *grp,
 		}
 	}
 out:
-	M0_LOG(M0_INFO, "nxr_bytes = %"PRIu64", copied_nr = %"PRIu64,
+	M0_LOG(M0_INFO, "YJC: nxr_bytes = %"PRIu64", copied_nr = %"PRIu64,
 	       ioo->ioo_nwxfer.nxr_bytes, ioo->ioo_copied_nr);
 
 	/* lock this as it isn't a locality group lock */
@@ -447,7 +459,7 @@ static void ioreq_iosm_handle_executed(struct m0_sm_group *grp,
 	struct m0_op_io          *ioo;
 	struct m0_pdclust_layout *play;
 
-	M0_ENTRY("op_io:ast %p", ast);
+	M0_ENTRY("YJC: op_io:ast %p", ast);
 
 	M0_PRE(grp != NULL);
 	M0_PRE(ast != NULL);
@@ -466,7 +478,7 @@ static void ioreq_iosm_handle_executed(struct m0_sm_group *grp,
 	 * which is partial, read-modify-write state transition is followed
 	 * for all parity groups.
 	 */
-	M0_LOG(M0_DEBUG, "map=%"PRIu64" map_nr=%"PRIu64,
+	M0_LOG(M0_DEBUG, "YJC: map=%"PRIu64" map_nr=%"PRIu64,
 	       ioo->ioo_map_idx, ioo->ioo_iomap_nr);
 	rmw = ioo->ioo_map_idx != ioo->ioo_iomap_nr;
 	if (ioreq_sm_state(ioo) == IRS_TRUNCATE_COMPLETE)
@@ -788,7 +800,8 @@ static int ioreq_iomaps_parity_groups_cal(struct m0_op_io *ioo)
 	/* Array of maximum possible number of groups spanned by req. */
 	grparray_sz = m0_vec_count(&ioo->ioo_ext.iv_vec) / data_size(play) +
 		      2 * SEG_NR(&ioo->ioo_ext);
-	M0_LOG(M0_DEBUG, "ioo=%p arr_sz=%"PRIu64, ioo, grparray_sz);
+	M0_LOG(M0_DEBUG, "YJC: ioo=%p ioo_ext_cnt = %"PRIu64" arr_sz=%"PRIu64,
+			ioo, m0_vec_count(&ioo->ioo_ext.iv_vec), grparray_sz);
 	M0_ALLOC_ARR(grparray, grparray_sz);
 	if (grparray == NULL)
 		return M0_ERR_INFO(-ENOMEM, "Failed to allocate memory"
@@ -801,6 +814,7 @@ static int ioreq_iomaps_parity_groups_cal(struct m0_op_io *ioo)
 		grpstart = group_id(INDEX(&ioo->ioo_ext, seg), data_size(play));
 		grpend	 = group_id(seg_endpos(&ioo->ioo_ext, seg) - 1,
 				    data_size(play));
+		M0_LOG(M0_DEBUG, "YJC: data size = %"PRIu64"", data_size(play));
 		for (grp = grpstart; grp <= grpend; ++grp) {
 			uint64_t i;
 			/*
@@ -820,6 +834,9 @@ static int ioreq_iomaps_parity_groups_cal(struct m0_op_io *ioo)
 				grparray[i] = grp;
 				++ioo->ioo_iomap_nr;
 			}
+				M0_LOG(M0_DEBUG,
+					"YJC: nr=%"PRIu64" size=%"PRIu64,
+					i , grparray_sz);
 		}
 	}
 	m0_free(grparray);
@@ -844,6 +861,7 @@ static int ioreq_iomaps_prepare(struct m0_op_io *ioo)
 	struct m0_bufvec_cursor   buf_cursor;
 
 	M0_ENTRY("op_io = %p", ioo);
+	M0_LOG(M0_DEBUG,"YJC: obj_id: " U128X_F, U128_P(&ioo->ioo_obj->ob_entity.en_id));
 
 	M0_PRE(ioo != NULL);
 	play = pdlayout_get(ioo);
@@ -854,7 +872,7 @@ static int ioreq_iomaps_prepare(struct m0_op_io *ioo)
 
 	if (ioo->ioo_oo.oo_oc.oc_op.op_code == M0_OC_FREE)
 		bufvec = false;
-	M0_LOG(M0_DEBUG, "ioo=%p spanned_groups=%"PRIu64
+	M0_LOG(M0_DEBUG, "YJC ioo=%p spanned_groups=%"PRIu64
 			 " [N,K,us]=[%d,%d,%"PRIu64"]",
 			 ioo, ioo->ioo_iomap_nr, layout_n(play),
 			 layout_k(play), layout_unit_size(play));
@@ -866,6 +884,7 @@ static int ioreq_iomaps_prepare(struct m0_op_io *ioo)
 		goto failed;
 	}
 
+	M0_LOG(M0_DEBUG, "YJC: Reading cksum buffer cksum = %s", (char *)ioo->ioo_attr.ov_buf[0]);
 	m0_ivec_cursor_init(&cursor, &ioo->ioo_ext);
 	if (bufvec)
 		m0_bufvec_cursor_init(&buf_cursor, &ioo->ioo_data);
@@ -897,8 +916,8 @@ static int ioreq_iomaps_prepare(struct m0_op_io *ioo)
 						bufvec ? &buf_cursor : NULL);
 		if (rc != 0)
 			goto failed;
-		M0_LOG(M0_INFO, "iomap_id=%"PRIu64" is populated",
-		       iomap->pi_grpid);
+		M0_LOG(M0_INFO, "YJC: pargrp_iomap id : %"PRIu64" populated",
+		       ioo->ioo_iomaps[i]->pi_grpid);
 	}
 
 	return M0_RC(0);
@@ -930,7 +949,6 @@ static uint64_t data_buf_copy(struct data_buf          *data,
 	uint64_t  copied = 0;
 	uint64_t  bytes;
 
-	M0_ENTRY();
 
 	M0_PRE(data != NULL);
 	M0_PRE(app_datacur != NULL);
@@ -938,12 +956,14 @@ static uint64_t data_buf_copy(struct data_buf          *data,
 	M0_PRE(M0_IN(dir, (CD_COPY_FROM_APP, CD_COPY_TO_APP)));
 
 	bytes = data->db_buf.b_nob;
+	M0_ENTRY("YJC: bytes = %"PRIu64"", bytes);
 	while (bytes > 0) {
 		app_data     = m0_bufvec_cursor_addr(app_datacur);
 		app_data_len = m0_bufvec_cursor_step(app_datacur);
 
 		/* Don't copy more bytes than we were supposed to */
 		app_data_len = (app_data_len < bytes)?app_data_len:bytes;
+		M0_LOG(M0_DEBUG, "YJC: app_data_len = %d", app_data_len);
 
 		if (app_data == NULL)
 			break;
@@ -1001,7 +1021,7 @@ static int application_data_copy(struct pargrp_iomap      *map,
 	m0_bindex_t               mask;
 	m0_bindex_t               grp_size;
 
-	M0_ENTRY("Copy %s application, start = %8"PRIu64", end = %8"PRIu64,
+	M0_ENTRY("YJC: Copy %s application, start = %8"PRIu64", end = %8"PRIu64,
 		 dir == CD_COPY_FROM_APP ? (char *)"from" : (char *)" to ",
 		 start, end);
 
@@ -1046,9 +1066,11 @@ static int application_data_copy(struct pargrp_iomap      *map,
 	M0_ASSERT(end - start == data->db_buf.b_nob);
 
 	if (dir == CD_COPY_FROM_APP) {
+		GET_CUR_ADDR_BUFVEC(datacur);
 		if ((data->db_flags & filter) == filter) {
 			if (data->db_flags & PA_COPY_FRMUSR_DONE) {
 				m0_bufvec_cursor_move(datacur, end - start);
+				GET_CUR_ADDR_BUFVEC(datacur);
 				return M0_RC(0);
 			}
 
@@ -1061,13 +1083,15 @@ static int application_data_copy(struct pargrp_iomap      *map,
 				if (filter != 0) {
 					m0_bufvec_cursor_move(
 						datacur, end - start);
+				GET_CUR_ADDR_BUFVEC(datacur);
 					return M0_RC(0);
 				}
 			}
 
 			/* Copies to appropriate offset within page. */
 			bytes = data_buf_copy(data, datacur, dir);
-			M0_LOG(M0_DEBUG, "%"PRIu64
+			//GET_CUR_ADDR_BUFVEC(datacur);
+			M0_LOG(M0_DEBUG, "YJC: %"PRIu64
 					 " bytes copied from application "
 					 "from offset %"PRIu64, bytes, start);
 			map->pi_ioo->ioo_copied_nr += bytes;
@@ -1132,7 +1156,7 @@ static int ioreq_application_data_copy(struct m0_op_io *ioo,
 	struct m0_ivec_cursor     extcur;
 	struct m0_pdclust_layout *play;
 
-	M0_ENTRY("op_io : %p, %s application. filter = 0x%x", ioo,
+	M0_ENTRY("YJC: op_io : %p, %s application. filter = 0x%x", ioo,
 		 dir == CD_COPY_FROM_APP ? (char *)"from" : (char *)"to",
 		 filter);
 
@@ -1150,6 +1174,10 @@ static int ioreq_application_data_copy(struct m0_op_io *ioo,
 		grpstart = data_size(play) * ioo->ioo_iomaps[i]->pi_grpid;
 		grpend   = grpstart + data_size(play);
 
+		M0_LOG(M0_DEBUG, "YJC: grpstart = %"PRIu64" data_size = %"PRIu64"",
+				grpstart, data_size(play));
+			GET_CUR_ADDR_BUFVEC(&appdatacur);
+			M0_LOG(M0_DEBUG, "YJC: index cur addr = %"PRIu64, m0_ivec_cursor_index(&extcur));
 		while (!m0_ivec_cursor_move(&extcur, count) &&
 			m0_ivec_cursor_index(&extcur) < grpend) {
 
@@ -1172,6 +1200,8 @@ static int ioreq_application_data_copy(struct m0_op_io *ioo,
 					rc, "[%p] Copy failed (pgstart=%" PRIu64
 					" pgend=%" PRIu64 ")",
 					ioo, pgstart, pgend);
+			GET_CUR_ADDR_BUFVEC(&appdatacur);
+			M0_LOG(M0_DEBUG, "YJC: index cur addr = %"PRIu64, m0_ivec_cursor_index(&extcur));
 		}
 	}
 

@@ -1358,6 +1358,7 @@ static int io_fop_ivec_prepare(struct m0_fop      *res_fop,
 	M0_PRE(res_fop != NULL);
 	M0_PRE(rbulk != NULL);
 	M0_PRE(m0_mutex_is_locked(&rbulk->rb_mutex));
+	M0_LOG(M0_DEBUG, "YJC: ci_nr = %d", iosegs_nr(rbulk));
 
 	rw          = io_rw_get(res_fop);
 	ivec        = &rw->crw_ivec;
@@ -1479,6 +1480,7 @@ static int io_fop_desc_alloc(struct m0_fop *fop, struct m0_rpc_bulk *rbulk)
 	rbulk = m0_fop_to_rpcbulk(fop);
 	rw = io_rw_get(fop);
 	rw->crw_desc.id_nr = rpcbulk_tlist_length(&rbulk->rb_buflist);
+	M0_LOG(M0_DEBUG, "YJC: rpc buflist length %d", rw->crw_desc.id_nr);
 	M0_ALLOC_ARR(rw->crw_desc.id_descs, rw->crw_desc.id_nr);
 	return rw->crw_desc.id_descs == NULL ? M0_ERR(-ENOMEM) : 0;
 }

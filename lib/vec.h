@@ -57,6 +57,8 @@ M0_INTERNAL m0_bcount_t m0_vec_count(const struct m0_vec *vec);
 
 M0_INTERNAL bool m0_vec_is_empty(const struct m0_vec *vec);
 
+M0_INTERNAL bool m0_vec_print(const struct m0_vec *vec);
+
 /**
    Position within a vector.
 

@@ -444,6 +444,7 @@ static int pargrp_iomap_populate_pi_ivec(struct pargrp_iomap     *map,
 	grpstart = grpsize * map->pi_grpid;
 	grpend   = grpstart + grpsize;
 	pagesize = m0__page_size(map->pi_ioo);
+	M0_LOG(M0_DEBUG, "YJC: grpsize=%"PRIu64" grpstart=%"PRIu64, grpsize, grpstart);
 
 	for (seg = 0; !m0_ivec_cursor_move(cursor, count) &&
 	               m0_ivec_cursor_index(cursor) < grpend;) {
@@ -477,7 +478,7 @@ static int pargrp_iomap_populate_pi_ivec(struct pargrp_iomap     *map,
 
 		++map->pi_ivec.iv_vec.v_nr;
 
-		M0_LOG(M0_DEBUG, "[%p] pre grp_id=%"PRIu64" seg=%"PRIu32
+		M0_LOG(M0_DEBUG, "YJC: [%p] pre grp_id=%"PRIu64" seg=%"PRIu32
 		       " =[%"PRIu64",+%"PRIu64")", map->pi_ioo, map->pi_grpid,
 		       seg, INDEX(&map->pi_ivec, seg),
 		            COUNT(&map->pi_ivec, seg));
@@ -488,7 +489,7 @@ static int pargrp_iomap_populate_pi_ivec(struct pargrp_iomap     *map,
 
 		seg_align(map, seg, seg_end, pagesize);
 
-		M0_LOG(M0_DEBUG, "[%p] post grp_id=%"PRIu64" seg=%"PRIu32
+		M0_LOG(M0_DEBUG, "YJC: [%p] post grp_id=%"PRIu64" seg=%"PRIu32
 				 " =[%"PRIu64",+%"PRIu64")", map->pi_ioo,
 				 map->pi_grpid, seg,
 				 INDEX(&map->pi_ivec, seg),
@@ -600,6 +601,10 @@ static int pargrp_iomap_populate(struct pargrp_iomap      *map,
 	grpstart = grpsize * map->pi_grpid;
 	grpend   = grpstart + grpsize;
 
+	M0_ENTRY("YJC: [%p] map=%p ivec=%p pr_grpid %"PRIu64, ioo, map,
+		cursor->ic_cur.vc_vec, map->pi_grpid);
+	M0_LOG(M0_DEBUG, "YJC: grpsize=%"PRIu64" grpstart=%"PRIu64, grpsize, grpstart);
+
 	/*
 	 * For a write, if this map does not span the whole parity group,
 	 * it is a read-modify-write.
@@ -628,9 +633,13 @@ static int pargrp_iomap_populate(struct pargrp_iomap      *map,
 	if (op->op_code == M0_OC_FREE && rmw)
 		map->pi_trunc_partial = true;
 
+	M0_LOG(M0_INFO, "YJC: [%p] grp_id=%"PRIu64": %s", ioo, map->pi_grpid,
+	                                             rmw ? "rmw" : "aligned");
 	/* In 'verify mode', read all data units in this parity group */
 	if (op->op_code == M0_OC_READ &&
 	    instance->m0c_config->mc_is_read_verify) {
+		M0_LOG(M0_DEBUG, "YJC: [%p] ivec=[%"PRIu64",+%"PRIu64")", ioo,
+		                              grpstart, grpsize);
 		/*
 		 * Full parity group.
 		 * Note: object doesn't have size attribute.
@@ -771,7 +780,7 @@ static int pargrp_iomap_seg_process(struct pargrp_iomap *map,
 	struct m0_op             *op;
 	m0_bindex_t               grp_off;
 
-	M0_ENTRY("map=%p seg=%"PRIu32", %s", map, seg, rmw ? "rmw" : "aligned");
+	M0_ENTRY("YJC: map=%p seg=%"PRIu32", %s", map, seg, rmw ? "rmw" : "aligned");
 
 	M0_PRE(map != NULL);
 	ioo = map->pi_ioo;
@@ -813,6 +822,9 @@ static int pargrp_iomap_seg_process(struct pargrp_iomap *map,
 		}
 
 		page_pos_get(map, start, grp_off, &row, &col);
+		M0_LOG(M0_DEBUG, "YJC: start = %"PRIu64" end = %"PRIu64
+				"grp_off %"PRIu64" row = %u col=%u", start, end,
+				grp_off, row, col);
 		M0_ASSERT(col <= map->pi_max_col);
 		M0_ASSERT(row <= map->pi_max_row);
 
@@ -835,7 +847,7 @@ static int pargrp_iomap_seg_process(struct pargrp_iomap *map,
 			if (rc == 0 && buf_cursor)
 				m0_bufvec_cursor_move(buf_cursor, count);
 		}
-		M0_LOG(M0_DEBUG, "alloc start=%8"PRIu64" count=%4"PRIu64
+		M0_LOG(M0_DEBUG, "YJC: alloc start=%8"PRIu64" count=%4"PRIu64
 			" grpid=%3"PRIu64" row=%u col=%u f=0x%x addr=%p",
 			 start, count, map->pi_grpid, row, col, flags,
 			 map->pi_databufs[row][col] ?
@@ -882,7 +894,7 @@ static int pargrp_iomap_databuf_alloc(struct pargrp_iomap     *map,
 	uint64_t              flags;
 	void                 *addr = NULL; /* required */
 
-	M0_ENTRY("row %u col %u", row, col);
+	M0_ENTRY("YJC: row %u col %u", row, col);
 
 	M0_PRE(map != NULL);
 	M0_PRE(col <= map->pi_max_col);
@@ -2348,7 +2360,7 @@ M0_INTERNAL int pargrp_iomap_init(struct pargrp_iomap  *map,
 	struct m0_client         *instance;
 	struct m0_op             *op;
 
-	M0_ENTRY("map = %p, op_io = %p, grpid = %"PRIu64, map, ioo, grpid);
+	M0_ENTRY("YJC: map = %p, op_io = %p, grpid = %"PRIu64, map, ioo, grpid);
 
 	M0_PRE(map != NULL);
 	M0_PRE(ioo != NULL);

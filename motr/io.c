@@ -19,7 +19,6 @@
  *
  */
 
-
 #include "motr/client.h"
 #include "motr/client_internal.h"
 #include "motr/layout.h"
@@ -28,6 +27,7 @@
 #include "motr/io.h"
 
 #include "lib/errno.h"             /* ENOMEM */
+#include "lib/string.h"
 #include "fid/fid.h"               /* m0_fid */
 #include "ioservice/fid_convert.h" /* m0_fid_convert_ */
 #include "rm/rm_service.h"         /* m0_rm_svc_domain_get */
@@ -37,6 +37,25 @@
 #include "lib/finject.h"
 
 #define DGMODE_IO
+
+#define print_m0buf(buf) do { \
+struct m0_bufvec_cursor cur; \
+void *data; \
+uint64_t step = 0; \
+m0_bufvec_cursor_init(&cur, buf); \
+while (!m0_bufvec_cursor_move(&cur, step)) { \
+	data = m0_bufvec_cursor_addr(&cur); \
+	step = m0_bufvec_cursor_step(&cur); \
+	M0_LOG(M0_DEBUG, "YJC: data buffer = %s", (char *)data); \
+}\
+}while(0)
+
+#define print_m0buf1(buf) { \
+	char p[128]; \
+	snprintf(p, 30, "%s", (char *)buf->ov_buf[0]); \
+	p[30] = '\0'; \
+        M0_LOG(M0_DEBUG, "YJC: Reading cksum buffer cksum = %s", (char *)buf->ov_buf[0]); \
+}
 
 /**
  * A note for rwlock.
@@ -257,8 +276,6 @@ static void obj_io_cb_launch(struct m0_op_common *oc)
 	struct m0_op_io          *ioo;
 	struct m0_pdclust_layout *play;
 
-	M0_ENTRY();
-
 	M0_PRE(oc != NULL);
 	M0_PRE(oc->oc_op.op_entity != NULL);
 	M0_PRE(m0_uint128_cmp(&M0_ID_APP,
@@ -274,6 +291,8 @@ static void obj_io_cb_launch(struct m0_op_common *oc)
 	M0_PRE_EX(m0_op_io_invariant(ioo));
 	cinst = m0__op_instance(op);
 	M0_PRE(cinst!= NULL);
+	M0_ENTRY("YJC: obj_id: " U128X_F, U128_P(&ioo->ioo_obj->ob_entity.en_id));
+
 
 	play = pdlayout_get(ioo);
 
@@ -729,7 +748,7 @@ int m0_obj_op(struct m0_obj       *obj,
 	struct m0_io_args          io_args;
 	enum m0_client_layout_type type;
 
-	M0_ENTRY();
+	M0_ENTRY("YJC: obj_id: " U128X_F, U128_P(&obj->ob_entity.en_id));
 	M0_PRE(obj != NULL);
 	M0_PRE(op != NULL);
 	M0_PRE(ergo(opcode == M0_OC_READ, M0_IN(flags, (0, M0_OOF_NOHOLE))));
@@ -764,6 +783,7 @@ int m0_obj_op(struct m0_obj       *obj,
 		layout_alloc = true;
 	}
 
+        M0_LOG(M0_DEBUG, "YJC: Reading cksum buffer cksum = %s", (char *)attr->ov_buf[0]); 
 	/* Build object's IO requests using its layout. */
 	obj_io_args_check(obj, opcode, ext, data, attr, mask);
 	segments_sort(ext, data, attr);
@@ -800,7 +820,7 @@ int m0_obj_op(struct m0_obj       *obj,
 	M0_POST(ergo(*op != NULL, (*op)->op_code == opcode &&
 		    (*op)->op_sm.sm_state == M0_OS_INITIALISED));
 
-	return M0_RC(0);
+	return M0_RC_INFO(0, "YJC: obj_id: " U128X_F, U128_P(&obj->ob_entity.en_id));
 exit:
 	return M0_ERR(rc);
 }

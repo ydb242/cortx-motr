@@ -34,9 +34,11 @@
 #include "lib/misc.h"    /* M0_CAT */
 #include "motr/magic.h"  /* M0_TRACE_DESCR_MAGIC */
 
+
 #ifndef __KERNEL__
 #include "lib/user_space/trace.h"
 #include <sys/user.h>    /* PAGE_SIZE */
+#include <execinfo.h>
 #endif
 
 /**
@@ -165,6 +167,7 @@
 
    M0_LOG() counts the number of arguments and calls correspondent M0_LOGx().
  */
+
 #define M0_LOG(level, ...) \
 	M0_CAT(M0_LOG, M0_COUNT_PARAMS(__VA_ARGS__))(level, __VA_ARGS__)
 
@@ -176,6 +179,40 @@
 	M0_LOG(M0_CALL, "< rc=%d", __rc);   \
 	__rc;                               \
 })
+
+
+#ifndef __KERNEL__
+#define M0_YJC2(fmt, ...)                   \
+do { \
+    int c, n=3, i; \
+    void *addresses[n]; \
+    char **strings; \
+    c = backtrace(addresses, n); \
+    strings = backtrace_symbols(addresses,c); \
+    for (i=0; i<c; i++) {  \
+    M0_LOG(M0_DEBUG, "YJC_BT: %s ->", strings[i]); } \
+    M0_LOG(M0_DEBUG, "YJC2: " fmt, ## __VA_ARGS__ ); \
+}while(0)
+#else
+#define M0_YJC2(fmt, ...)                   \
+    M0_LOG(M0_DEBUG, "YJC: " fmt, ## __VA_ARGS__ );
+#endif
+
+
+#ifndef __KERNEL__
+#define M0_YJC(fmt, ...)                   \
+do { \
+    int c, n=2; \
+    void *addresses[n]; \
+    char **strings; \
+    c = backtrace(addresses, n); \
+    strings = backtrace_symbols(addresses,c); \
+    M0_LOG(M0_DEBUG, "YJC: %s ->" fmt, strings[1], ## __VA_ARGS__ );  \
+}while(0)
+#else
+#define M0_YJC(fmt, ...)                   \
+    M0_LOG(M0_DEBUG, "YJC: " fmt, ## __VA_ARGS__ );
+#endif
 
 #define M0_ERR(rc) ({                        \
 	typeof(rc) __rc = (rc);              \

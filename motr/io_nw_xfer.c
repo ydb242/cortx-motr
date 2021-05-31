@@ -420,7 +420,7 @@ static struct target_ioreq *target_ioreq_locate(struct nw_xfer_request *xfer,
 {
 	struct target_ioreq *ti;
 
-	M0_ENTRY("nw_xfer_request %p, fid %p", xfer, fid);
+	M0_ENTRY("YJC: nw_xfer_request %p, fid %p", xfer, fid);
 
 	M0_PRE(nw_xfer_request_invariant(xfer));
 	M0_PRE(fid != NULL);
@@ -492,7 +492,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	frame = tgt->ta_frame;
 	M0_PRE(src != NULL);
 	unit  = src->sa_unit;
-	M0_ENTRY("tio req %p, gob_offset %"PRIu64", count %"PRIu64
+	M0_ENTRY("YJC tio req %p, gob_offset %"PRIu64", count %"PRIu64
 		 " frame %"PRIu64" unit %"PRIu64,
 		 ti, gob_offset, count, frame, unit);
 
@@ -515,10 +515,10 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	goff    = unit_type == M0_PUT_DATA ? gob_offset : 0;
 
 	M0_LOG(M0_DEBUG,
-	       "[gpos %"PRIu64", count %"PRIu64"] [%"PRIu64", %"PRIu64"]"
-	       "->[%"PRIu64",%"PRIu64"] %c", gob_offset, count, src->sa_group,
+	       "YJC: [gpos %"PRIu64", count %"PRIu64"] [%"PRIu64", %"PRIu64"]"
+	       "->[%"PRIu64",%"PRIu64"] %s toff = %"PRIu64, gob_offset, count, src->sa_group,
 	       src->sa_unit, tgt->ta_frame, tgt->ta_obj,
-	       unit_type == M0_PUT_DATA ? 'D' : 'P');
+	       unit_type == M0_PUT_DATA ? "Data" : "Parity", toff);
 
 	/* Use ti_dgvec as long as it is dgmode-read/write. */
 	if (ioreq_sm_state(ioo) == IRS_DEGRADED_READING ||
@@ -530,7 +530,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		pattr = ti->ti_dgvec->dr_pageattrs;
 		cnt = page_nr(ioo->ioo_iomap_nr * layout_unit_size(play) *
 		      (layout_n(play) + layout_k(play)), ioo->ioo_obj);
-		M0_LOG(M0_DEBUG, "map_nr=%"PRIu64" req state=%u cnt=%"PRIu64,
+		M0_LOG(M0_DEBUG, "YJC: degraded map_nr=%"PRIu64" req state=%u cnt=%"PRIu64,
 				 ioo->ioo_iomap_nr, ioreq_sm_state(ioo), cnt);
 	} else {
 		ivec  = &ti->ti_ivec;
@@ -540,7 +540,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		pattr = ti->ti_pageattrs;
 		cnt = page_nr(ioo->ioo_iomap_nr * layout_unit_size(play) *
 			      layout_n(play), ioo->ioo_obj);
-		M0_LOG(M0_DEBUG, "map_nr=%"PRIu64" req state=%u cnt=%"PRIu64,
+		M0_LOG(M0_DEBUG, "YJC: map_nr=%"PRIu64" req state=%u cnt=%"PRIu64,
 				 ioo->ioo_iomap_nr, ioreq_sm_state(ioo), cnt);
 	}
 
@@ -562,12 +562,12 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 			buf = map->pi_databufs[row][col];
 
 			pattr[seg] |= PA_DATA;
-			M0_LOG(M0_DEBUG, "Data seg %u added", seg);
+			M0_LOG(M0_DEBUG, "YJC: Data seg %u added", seg);
 		} else {
 			buf = map->pi_paritybufs[page_id(goff, ioo->ioo_obj)]
 			[unit - layout_n(play)];
 			pattr[seg] |= PA_PARITY;
-			M0_LOG(M0_DEBUG, "Parity seg %u added", seg);
+			M0_LOG(M0_DEBUG, "YJC: Parity seg %u added", seg);
 		}
 		buf->db_tioreq = ti;
 		if (buf->db_flags & PA_WRITE)
@@ -580,7 +580,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 			INDEX(trunc_ivec, tseg) = pgstart;
 			COUNT(trunc_ivec, tseg) = pgend - pgstart;
 			++trunc_ivec->iv_vec.v_nr;
-			M0_LOG(M0_DEBUG, "Seg id %d [%"PRIu64", %"PRIu64"]"
+			M0_LOG(M0_DEBUG, "YJC: Seg id %d [%"PRIu64", %"PRIu64"]"
 					 "added to target ioreq with "FID_F,
 					 tseg, INDEX(trunc_ivec, tseg),
 					 COUNT(trunc_ivec, tseg),
@@ -600,14 +600,14 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 			auxbvec->ov_vec.v_count[seg] = page_size;
 		}
 		pattr[seg] |= buf->db_flags;
-		M0_LOG(M0_DEBUG, "pageaddr=%p, auxpage=%p,"
+		M0_LOG(M0_DEBUG, "YJC: pageaddr=%p, auxpage=%p,"
 				 " index=%6"PRIu64", size=%4"PRIu64
 				 " grpid=%3"PRIu64" flags=%4x for "FID_F,
 		                 bvec->ov_buf[seg], auxbvec->ov_buf[seg],
 				 INDEX(ivec, seg), COUNT(ivec, seg),
 				 map->pi_grpid, pattr[seg],
 				 FID_P(&ti->ti_fid));
-		M0_LOG(M0_DEBUG, "Seg id %d [%"PRIu64", %"PRIu64
+		M0_LOG(M0_DEBUG, "YJC: Seg id %d [%"PRIu64", %"PRIu64
 				 "] added to target_ioreq with "FID_F
 				 " with flags 0x%x: ", seg,
 				 INDEX(ivec, seg), COUNT(ivec, seg),
@@ -616,6 +616,8 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		goff += COUNT(ivec, seg);
 		++ivec->iv_vec.v_nr;
 		pgstart = pgend;
+//		M0_LOG(M0_DEBUG, "YJC: goff %"PRIu64", count %"PRIu64" pgstart = %"PRIu64",pgend = %"PRIu64, goff, ivec->iv_vec.v_nr, pgstart, pgend);
+		//M0_LOG(M0_DEBUG, "YJC: goff %"PRIu64" v_nr %"PRIu64, goff, ivec->iv_vec.v_nr);
 	}
 	M0_LEAVE();
 }
@@ -689,8 +691,6 @@ static int bulk_buffer_add(struct ioreq_fop        *irfop,
 	M0_PRE(rbuf   != NULL);
 	M0_PRE(delta  != NULL);
 	M0_PRE(maxsize > 0);
-	M0_ENTRY("ioreq_fop %p net_domain %p delta_size %d",
-		 irfop, dom, *delta);
 
 	ioo     = bob_of(irfop->irf_tioreq->ti_nwxfer, struct m0_op_io,
 			 ioo_nwxfer, &ioo_bobtype);
@@ -700,6 +700,8 @@ static int bulk_buffer_add(struct ioreq_fop        *irfop,
 	seg_nr  = min32(m0_net_domain_get_max_buffer_segments(dom),
 			SEG_NR(ivec));
 	*delta += io_desc_size(dom);
+	M0_ENTRY("YJC: ioreq_fop %p net_domain %p delta_size %d seg_nr = %d",
+		 irfop, dom, *delta, seg_nr);
 
 	if (m0_io_fop_size_get(&irfop->irf_iofop.if_fop) + *delta < maxsize) {
 		rc = m0_rpc_bulk_buf_add(&irfop->irf_iofop.if_rbulk, seg_nr,
@@ -771,7 +773,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 	bool                         read_in_write = false;
 	void                        *buf;
 
-	M0_ENTRY("prepare io fops for target ioreq %p filter 0x%x, tfid "FID_F,
+	M0_ENTRY("YJC: prepare io fops for target ioreq %p filter 0x%x, tfid "FID_F,
 		 ti, filter, FID_P(&ti->ti_fid));
 
 	M0_PRE(target_ioreq_invariant(ti));
@@ -817,8 +819,8 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		delta  = 0;
 		bbsegs = 0;
 
-		M0_LOG(M0_DEBUG, "pageattr = %u, filter = %u, rw = %u",
-		       pattr[seg], filter, rw);
+		M0_LOG(M0_DEBUG, "YJC: pageattr = %u, filter = %u, rw = %u bbseg = %d",
+		       pattr[seg], filter, rw, bbsegs);
 
 		if (!(pattr[seg] & filter) || !(pattr[seg] & rw) ||
 		     (pattr[seg] & PA_TRUNC)) {
@@ -836,6 +838,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 			m0_free(irfop);
 			goto err;
 		}
+		M0_LOG(M0_DEBUG, "YJC: io fop initialsied");
 
 		iofop = &irfop->irf_iofop;
 		rw_fop = io_rw_get(&iofop->if_fop);
@@ -868,10 +871,13 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 				if (filter == PA_DATA &&
 				    read_in_write &&
 				    auxbvec != NULL &&
-				    auxbvec->ov_buf[seg] != NULL)
+				    auxbvec->ov_buf[seg] != NULL) {
 					buf = auxbvec->ov_buf[seg];
-				else
+					M0_LOG(M0_DEBUG, "YJC:  using auxilary buffer");
+				} else {
 					buf = bvec->ov_buf[seg];
+					M0_LOG(M0_DEBUG, "YJC:  using ov_buf buffer");
+				}
 
 				rc = m0_rpc_bulk_buf_databuf_add(rbuf,
 					buf, COUNT(ivec, seg),
@@ -944,6 +950,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		 * Simply return 0 just like it does for user space at this
 		 * moment.
 		 */
+		M0_LOG(M0_DEBUG, "YJC: preparing io fop");
 		rc = m0_io_fop_prepare(&iofop->if_fop);
 		if (rc != 0)
 			goto fini_fop;
@@ -957,7 +964,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		iofops_tlist_add(&ti->ti_iofops, irfop);
 
 		M0_LOG(M0_DEBUG,
-		       "fop=%p bulk=%p (%s) @"FID_F" io fops = %"PRIu64
+		       "YJC: fop=%p bulk=%p (%s) @"FID_F" io fops = %"PRIu64
 		       " read bulks = %"PRIu64", list_len=%d",
 		       &iofop->if_fop, &iofop->if_rbulk,
 		       m0_is_read_fop(&iofop->if_fop) ? "r" : "w",
@@ -988,7 +995,7 @@ static const struct target_ioreq_ops tioreq_ops = {
 static int target_cob_fop_prepare(struct target_ioreq *ti)
 {
 	int rc;
-	M0_ENTRY("ti=%p type=%d", ti, ti->ti_req_type);
+	M0_ENTRY("YJC: ti=%p type=%d", ti, ti->ti_req_type);
 	M0_PRE(M0_IN(ti->ti_req_type, (TI_COB_CREATE, TI_COB_TRUNCATE)));
 
 	rc = ioreq_cc_fop_init(ti);
@@ -1146,7 +1153,7 @@ static int nw_xfer_tioreq_get(struct nw_xfer_request *xfer,
 	struct m0_client       *instance;
 
 	M0_PRE(fid != NULL);
-	M0_ENTRY("nw_xfer_request %p, "FID_F, xfer, FID_P(fid));
+	M0_ENTRY("YJC: nw_xfer_request %p, "FID_F, xfer, FID_P(fid));
 
 	M0_PRE(session != NULL);
 	M0_PRE(out != NULL);
@@ -1230,7 +1237,7 @@ static int nw_xfer_io_distribute(struct nw_xfer_request *xfer)
 	struct m0_client           *instance;
 	m0_bcount_t                 grp_size;
 
-	M0_ENTRY("nw_xfer_request %p", xfer);
+	M0_ENTRY("YJC: nw_xfer_request %p", xfer);
 
 	M0_PRE(nw_xfer_request_invariant(xfer));
 
@@ -1242,6 +1249,8 @@ static int nw_xfer_io_distribute(struct nw_xfer_request *xfer)
 	unit_size = layout_unit_size(play);
 	instance  = m0__op_instance(op);
 	rc = m0_bitmap_init(&units_spanned, m0_pdclust_size(play));
+	M0_LOG(M0_DEBUG, "YJC: Units N = %d K = %d P = %d ",
+			play->pl_attr.pa_N, play->pl_attr.pa_K, play->pl_attr.pa_P);
 
 	for (i = 0; i < ioo->ioo_iomap_nr; ++i) {
 		count        = 0;
@@ -1259,6 +1268,7 @@ static int nw_xfer_io_distribute(struct nw_xfer_request *xfer)
 		while (!m0_ivec_cursor_move(&cursor, count)) {
 			unit = (m0_ivec_cursor_index(&cursor) - pgstart) /
 				unit_size;
+			M0_LOG(M0_DEBUG, "unit = %"PRIu64" pgstart = %"PRIu64, unit, pgstart);
 
 			u_ext.e_start = pgstart + unit * unit_size;
 			u_ext.e_end   = u_ext.e_start + unit_size;
@@ -1276,6 +1286,8 @@ static int nw_xfer_io_distribute(struct nw_xfer_request *xfer)
 			}
 
 			count     = m0_ext_length(&r_ext);
+			M0_LOG(M0_DEBUG, "YJC: user ext len = %"PRIu64" result ext = %"PRIu64" unitsize = %"PRIu64" ",
+					m0_ext_length(&u_ext), count, unit_size);
 			unit_type = m0_pdclust_unit_classify(play, unit);
 			if (unit_type == M0_PUT_SPARE ||
 				unit_type == M0_PUT_PARITY)
@@ -1430,7 +1442,7 @@ static void nw_xfer_req_complete(struct nw_xfer_request *xfer, bool rmw)
 	struct m0_fop          *fop;
 	struct m0_rpc_item     *item;
 
-	M0_ENTRY("nw_xfer_request %p, rmw %s", xfer,
+	M0_ENTRY("YJC nw_xfer_request %p, rmw %s", xfer,
 		 rmw ? (char *)"true" : (char *)"false");
 
 	M0_PRE(xfer != NULL);
@@ -1591,12 +1603,14 @@ static int nw_xfer_req_dispatch(struct nw_xfer_request *xfer)
 		if (ioreq_sm_state(ioo) == IRS_TRUNCATE) {
 		    if (ti->ti_req_type == TI_READ_WRITE) {
 			ti->ti_req_type = TI_COB_TRUNCATE;
+			M0_LOG(M0_DEBUG, "YJC: calling cob prepare");
 			rc = ti->ti_ops->tio_cc_fops_prepare(ti);
 			if (rc != 0)
 				return M0_ERR(rc);
 			}
 			continue;
 		}
+		M0_LOG(M0_DEBUG, "YJC: calling cob prepare");
 		rc = ti->ti_ops->tio_iofops_prepare(ti, PA_DATA) ?:
 			ti->ti_ops->tio_iofops_prepare(ti, PA_PARITY);
 		if (rc != 0)
@@ -1740,7 +1754,7 @@ static int nw_xfer_tioreq_map(struct nw_xfer_request           *xfer,
 	struct m0_pdclust_src_addr  spare;
 	struct m0_poolmach         *pm;
 
-	M0_ENTRY("nw_xfer_request %p", xfer);
+	M0_ENTRY("YJC: nw_xfer_request %p", xfer);
 
 	M0_PRE(nw_xfer_request_invariant(xfer));
 	M0_PRE(src != NULL);
@@ -1757,16 +1771,16 @@ static int nw_xfer_tioreq_map(struct nw_xfer_request           *xfer,
 	spare = *src;
 	m0_fd_fwd_map(play_instance, src, tgt);
 	tfid = target_fid(ioo, tgt);
-	M0_LOG(M0_DEBUG, "src_id[%"PRIu64":%"PRIu64"] -> "
-			 "dest_id[%"PRIu64":%"PRIu64"] @ tfid "FID_F,
-	       src->sa_group, src->sa_unit, tgt->ta_frame, tgt->ta_obj,
-	       FID_P(&tfid));
-
 	pm = ioo_to_poolmach(ioo);
 	M0_ASSERT(pm != NULL);
 	rc = m0_poolmach_device_state(pm, tgt->ta_obj, &device_state);
 	if (rc != 0)
 		return M0_RC(rc);
+	M0_LOG(M0_DEBUG, "YJC: tgt->ta_obj = %"PRIu64" src_id[%"PRIu64":%"PRIu64"] -> "
+			 "dest_id[%"PRIu64":%"PRIu64"] @ tfid "FID_F, tgt->ta_obj,
+	       src->sa_group, src->sa_unit, tgt->ta_frame, tgt->ta_obj,
+	       FID_P(&tfid));
+
 
 	if (M0_FI_ENABLED("poolmach_client_repaired_device1")) {
 		if (tfid.f_container == 1)
@@ -1832,7 +1846,7 @@ static int nw_xfer_tioreq_map(struct nw_xfer_request           *xfer,
 	 *    req->ir_sns_state == SRS_REPAIR_NOTDONE.
 	 *    Unlikely case! What to do in this case?
 	 */
-	M0_LOG(M0_INFO, "[%p] tfid "FID_F ", device state = %d\n",
+	M0_LOG(M0_INFO, "YJC: [%p] tfid "FID_F ", device state = %d\n",
 	       ioo, FID_P(&tfid), device_state);
 	if (should_spare_be_mapped(ioo, device_state)) {
 		gfid = &ioo->ioo_oo.oo_fid;
@@ -1867,6 +1881,7 @@ static int nw_xfer_tioreq_map(struct nw_xfer_request           *xfer,
 	}
 	session = target_session(ioo, tfid);
 
+	M0_LOG(M0_DEBUG, "YJC: ta_obj = %"PRIu64" layout_unit_size = %"PRIu64" ioo_iomap_nr = %"PRIu64, tgt->ta_obj, layout_unit_size(play), ioo->ioo_iomap_nr);
 	rc = nw_xfer_tioreq_get(xfer, &tfid, tgt->ta_obj, session,
 				layout_unit_size(play) * ioo->ioo_iomap_nr,
 				out);

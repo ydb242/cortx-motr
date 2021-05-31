@@ -1162,7 +1162,7 @@ M0_INTERNAL void m0_poolmach_gob2cob(struct m0_poolmach *pm,
 	m0_fid_convert_gob2cob(gfid, cob_fid,
 			       pms->pst_devices_array[idx].pd_sdev_idx);
 
-	M0_LOG(M0_DEBUG, "gob fid "FID_F" @%d = cob fid "FID_F, FID_P(gfid),
+	M0_LOG(M0_DEBUG, "YJC: gob fid "FID_F" @%d = cob fid "FID_F, FID_P(gfid),
 			idx, FID_P(cob_fid));
 }
 

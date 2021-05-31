@@ -443,6 +443,7 @@ static void be_alloc_chunk_init(struct m0_be_allocator *a,
 		.bac_zone   = ztype,
 		.bac_magic1 = M0_BE_ALLOC_MAGIC1,
 	};
+	//M0_YJC("YJC: size = %"PRIu64"", size);
 	chunks_all_be_tlink_create(c, tx);
 	/*
 	 * Move this right before m0_be_tlink_create() to optimize capturing
