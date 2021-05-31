@@ -177,7 +177,7 @@ stob_ad_domain2ad(const struct m0_stob_domain *dom)
 }
 
 static void balloc_cfg_get_from_config(struct m0_ad_balloc_format_req *bcfg,
-				  struct ad_domain_cfg *adom_cfg)
+				       struct ad_domain_cfg           *adom_cfg)
 {
 	M0_PRE(adom_cfg != NULL);
 
@@ -196,7 +196,7 @@ static void balloc_cfg_get_from_config(struct m0_ad_balloc_format_req *bcfg,
 }
 
 static void balloc_cfg_get_from_adom(struct m0_ad_balloc_format_req *bcfg,
-				  struct m0_stob_ad_domain  *adom)
+				     struct m0_stob_ad_domain       *adom)
 {
 
 	M0_PRE(adom != NULL);
@@ -435,8 +435,8 @@ static int stob_ad_domain_init(struct m0_stob_type *type,
 	struct m0_be_seg               *seg;
 	struct m0_ad_balloc            *ballroom;
 	bool                            balloc_inited;
-	int                             rc = 0;
 	struct m0_ad_balloc_format_req  bcfg;
+	int                             rc = 0;
 
 	adom = stob_ad_domain_locate(location_data);
 	if (adom == NULL)

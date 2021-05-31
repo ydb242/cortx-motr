@@ -157,7 +157,7 @@ static bool is_normal(uint64_t alloc_flags);
 static bool is_any(uint64_t alloc_flag);
 
 static int index_hash(struct m0_balloc_super_block *sb,
-			m0_bcount_t block_offset)
+		      m0_bcount_t                   block_offset)
 {
 	return (block_offset - 1) / sb->bsb_groupsize % sb->bsb_indexcount;
 };
@@ -558,10 +558,9 @@ static int sb_update(struct m0_balloc *bal, struct m0_sm_group *grp)
 	return M0_RC(rc);
 }
 
-static int balloc_sb_write(
-			struct m0_balloc                *bal,
-			struct m0_ad_balloc_format_req  *req,
-			struct m0_sm_group              *grp)
+static int balloc_sb_write(struct m0_balloc               *bal,
+			   struct m0_ad_balloc_format_req *req,
+			   struct m0_sm_group             *grp)
 {
 	int				 rc;
 	struct timeval			 now;
@@ -886,8 +885,8 @@ static int balloc_groups_write(struct m0_balloc *bal)
    @return 0 means success. Otherwise, error number will be returned.
  */
 static int balloc_format(struct m0_balloc                *bal,
-			struct m0_ad_balloc_format_req   *req,
-			struct m0_sm_group               *grp)
+			 struct m0_ad_balloc_format_req  *req,
+			 struct m0_sm_group              *grp)
 {
 	int rc;
 
@@ -3046,11 +3045,11 @@ M0_INTERNAL void m0_balloc_init(struct m0_balloc *cb)
 	cb->cb_ballroom.ab_ops = &balloc_ops;
 }
 
-M0_INTERNAL int m0_balloc_create(uint64_t			 cid,
-				struct m0_be_seg		*seg,
-				struct m0_sm_group		*grp,
-				struct m0_ad_balloc_format_req	*bcfg,
-				struct m0_balloc		**out)
+M0_INTERNAL int m0_balloc_create(uint64_t			  cid,
+				 struct m0_be_seg                *seg,
+				 struct m0_sm_group              *grp,
+				 struct m0_ad_balloc_format_req	 *bcfg,
+				 struct m0_balloc               **out)
 {
 	struct m0_balloc       *cb;
 	struct m0_be_btree      btree = {};
@@ -3105,6 +3104,7 @@ M0_INTERNAL int m0_balloc_create(uint64_t			 cid,
 				for (i = 0; i < bcfg->bfr_indexcount; i++) {
 					m0_be_btree_fini(&cb->cb_db_group_extents[i]);
 				}
+				m0_be_btree_fini(&cb->cb_db_group_desc);
 			}
 		}
 		m0_be_tx_close_sync(&tx);
