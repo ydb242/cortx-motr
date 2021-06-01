@@ -209,6 +209,7 @@ M0_INTERNAL int m0_bufvec_empty_alloc(struct m0_bufvec *bufvec,
 M0_INTERNAL int m0_bufvec_extend(struct m0_bufvec *bufvec,
 				 uint32_t num_segs);
 
+M0_INTERNAL bool m0_bufvec_print(struct m0_bufvec *buf);
 /**
  * Merges the source bufvec to the destination bufvec.
  * Assumes that all segments are of equal size.

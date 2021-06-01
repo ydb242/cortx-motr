@@ -1176,6 +1176,7 @@ M0_INTERNAL int m0_io_fom_cob_rw_create(struct m0_fop *fop, struct m0_fom **out,
 	stobio_tlist_init(&fom_obj->fcrw_stio_list);
 	stobio_tlist_init(&fom_obj->fcrw_done_list);
 
+	M0_LOG(M0_DEBUG, "fcrw_total_ioivec_cnt = %"PRIu64, fom_obj->fcrw_total_ioivec_cnt);
 	M0_LOG(M0_DEBUG, "fom=%p : op=%s, desc=%d gfid"FID_F"cob fid"FID_F
 	       "pver"FID_F, fom, m0_is_read_fop(fop) ? "READ" : "WRITE",
 	       rwfop->crw_desc.id_nr, FID_P(&rwfop->crw_gfid),
@@ -1786,6 +1787,8 @@ static int io_launch(struct m0_fom *fom)
 					  mem_ivec, &nb->nb_buffer,
 					  &cksum_data));
 			}
+			M0_LOG(M0_DEBUG, "YJC: print cksum buffer");
+			//m0_bufvec_print(rwfop->crw_di_data_cksum);
 		}
 		stio->si_opcode = m0_is_write_fop(fop) ? SIO_WRITE : SIO_READ;
 

@@ -782,6 +782,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 	/* Is it in the READ phase of WRITE request. */
 	bool                         read_in_write = false;
 	void                        *buf;
+	struct m0_bufvec            *attrbvec;
 
 	M0_ENTRY("YJC: prepare io fops for target ioreq %p filter 0x%x, tfid "FID_F,
 		 ti, filter, FID_P(&ti->ti_fid));
@@ -943,6 +944,9 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		rw_fop->crw_fid = ti->ti_fid;
 		rw_fop->crw_pver = ioo->ioo_pver;
 		rw_fop->crw_index = ti->ti_obj;
+		attrbvec = &ti->ti_attrbufvec;
+		rw_fop->crw_di_data_cksum = attrbvec;
+
 		if (ioo->ioo_flags & M0_OOF_NOHOLE)
 			rw_fop->crw_flags |= M0_IO_FLAG_NOHOLE;
 		if (ioo->ioo_flags & M0_OOF_SYNC)

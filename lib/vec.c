@@ -66,6 +66,21 @@ M0_INTERNAL bool m0_vec_is_empty(const struct m0_vec *vec)
 	return true;
 }
 
+M0_INTERNAL bool m0_bufvec_print(struct m0_bufvec *buf)
+{
+	uint32_t i;
+	struct m0_vec *vec = &buf->ov_vec;
+
+	for (i = 0; i < vec->v_nr; ++i) {
+		if (vec->v_count[i] > 0) {
+			//M0_LOG(M0_DEBUG, "YJC count %d %"PRIu64"", i, vec->v_count[i]);
+			M0_LOG(M0_DEBUG, "YJC:i = %d count[i] = %"PRIu64 "ov buf = %s",
+				i, vec->v_count[i], (char *)buf->ov_buf[i]);
+		}
+	}
+	return true;
+}
+
 M0_INTERNAL bool m0_vec_print(const struct m0_vec *vec)
 {
 	uint32_t i;
