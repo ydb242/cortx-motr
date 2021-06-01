@@ -481,12 +481,14 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	struct m0_indexvec        *trunc_ivec = NULL;
 	struct m0_bufvec          *bvec;
 	struct m0_bufvec          *auxbvec;
+	struct m0_bufvec          *attrbvec;
 	enum m0_pdclust_unit_type  unit_type;
 	enum page_attr            *pattr;
 	uint64_t                   cnt;
 	unsigned int               opcode;
 	m0_bcount_t                grp_size;
 	uint64_t                   page_size;
+	uint32_t                   attr_idx;
 
 	M0_PRE(tgt != NULL);
 	frame = tgt->ta_frame;
@@ -544,6 +546,8 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 				 ioo->ioo_iomap_nr, ioreq_sm_state(ioo), cnt);
 	}
 
+	//YJC: Move this to above else section during io write
+	attrbvec = &ti->ti_attrbufvec;
 	while (pgstart < toff + count) {
 		pgend = min64u(pgstart + page_size,
 			       toff + count);
@@ -552,6 +556,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		INDEX(ivec, seg) = pgstart;
 		COUNT(ivec, seg) = pgend - pgstart;
 
+		attr_idx = 0;
 		if (unit_type == M0_PUT_DATA) {
 			uint32_t row = map->pi_max_row;
 			uint32_t col = map->pi_max_col;
@@ -560,9 +565,10 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 			M0_ASSERT(row <= map->pi_max_row);
 			M0_ASSERT(col <= map->pi_max_col);
 			buf = map->pi_databufs[row][col];
+			attr_idx = row;
 
 			pattr[seg] |= PA_DATA;
-			M0_LOG(M0_DEBUG, "YJC: Data seg %u added", seg);
+			M0_LOG(M0_DEBUG, "YJC: Data seg %u row - %u col = %u added", row, col, seg);
 		} else {
 			buf = map->pi_paritybufs[page_id(goff, ioo->ioo_obj)]
 			[unit - layout_n(play)];
@@ -593,6 +599,10 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		M0_ASSERT(addr_is_network_aligned(buf->db_buf.b_addr));
 		bvec->ov_buf[seg] = buf->db_buf.b_addr;
 		bvec->ov_vec.v_count[seg] = COUNT(ivec, seg);
+		M0_LOG(M0_DEBUG, "YJC: Writing target vector for seg %d from %d", seg, attr_idx);
+		attrbvec->ov_buf[seg] = buf->db_attrbuf.ov_buf[attr_idx];
+		attrbvec->ov_vec.v_count[seg] = buf->db_attrbuf.ov_vec.v_count[seg];
+		M0_LOG(M0_DEBUG, "YJC: target buffer ov buf = %s", (char *)attrbvec->ov_buf[seg]);
 		if (map->pi_rtype == PIR_READOLD &&
 		    unit_type == M0_PUT_DATA) {
 			M0_ASSERT(buf->db_auxbuf.b_addr != NULL);
@@ -1028,7 +1038,7 @@ static int target_ioreq_init(struct target_ioreq    *ti,
 	uint32_t                nr;
 
 	M0_PRE(cobfid  != NULL);
-	M0_ENTRY("target_ioreq %p, nw_xfer_request %p, "FID_F,
+	M0_ENTRY("YJC: target_ioreq %p, nw_xfer_request %p, "FID_F,
 		 ti, xfer, FID_P(cobfid));
 
 	M0_PRE(ti      != NULL);
@@ -1067,6 +1077,7 @@ static int target_ioreq_init(struct target_ioreq    *ti,
 	target_ioreq_bob_init(ti);
 
 	nr = page_nr(size, ioo->ioo_obj);
+	M0_LOG(M0_DEBUG, "YJC: %"PRIu32 "pages allocated for ivec for size = %"PRIu64, nr, size);
 	rc = m0_indexvec_alloc(&ti->ti_ivec, nr);
 	if (rc != 0)
 		goto out;
@@ -1083,6 +1094,15 @@ static int target_ioreq_init(struct target_ioreq    *ti,
 
 	M0_ALLOC_ARR(ti->ti_bufvec.ov_buf, nr);
 	if (ti->ti_bufvec.ov_buf == NULL)
+		goto fail;
+
+	ti->ti_attrbufvec.ov_vec.v_nr = nr;
+	M0_ALLOC_ARR(ti->ti_attrbufvec.ov_vec.v_count, nr);
+	if (ti->ti_attrbufvec.ov_vec.v_count == NULL)
+		goto fail;
+
+	M0_ALLOC_ARR(ti->ti_attrbufvec.ov_buf, nr);
+	if (ti->ti_attrbufvec.ov_buf == NULL)
 		goto fail;
 
 	/*
@@ -1610,7 +1630,7 @@ static int nw_xfer_req_dispatch(struct nw_xfer_request *xfer)
 			}
 			continue;
 		}
-		M0_LOG(M0_DEBUG, "YJC: calling cob prepare");
+		M0_LOG(M0_DEBUG, "YJC: calling io prepare");
 		rc = ti->ti_ops->tio_iofops_prepare(ti, PA_DATA) ?:
 			ti->ti_ops->tio_iofops_prepare(ti, PA_PARITY);
 		if (rc != 0)

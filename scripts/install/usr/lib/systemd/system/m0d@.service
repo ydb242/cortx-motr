@@ -26,8 +26,9 @@ Before=motr-trace@%i.service
 
 [Service]
 Type=notify
-TimeoutStopSec=5min
+TimeoutStopSec=5Sec
 Restart=no
 Environment=SHELL=/bin/bash
 Group=motr
 ExecStart=/usr/libexec/cortx-motr/motr-server m0d-%i
+ExecStop=kill -9 $MAINPID

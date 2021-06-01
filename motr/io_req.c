@@ -859,6 +859,10 @@ static int ioreq_iomaps_prepare(struct m0_op_io *ioo)
 	struct m0_pdclust_layout *play;
 	struct m0_ivec_cursor     cursor;
 	struct m0_bufvec_cursor   buf_cursor;
+	struct m0_bufvec_cursor   attr_cursor;
+        m0_bcount_t               nbytes;
+        m0_bcount_t               nbytes_copied;
+	void		    	  *attr_databuf;                 
 
 	M0_ENTRY("op_io = %p", ioo);
 	M0_LOG(M0_DEBUG,"YJC: obj_id: " U128X_F, U128_P(&ioo->ioo_obj->ob_entity.en_id));
@@ -884,10 +888,20 @@ static int ioreq_iomaps_prepare(struct m0_op_io *ioo)
 		goto failed;
 	}
 
-	M0_LOG(M0_DEBUG, "YJC: Reading cksum buffer cksum = %s", (char *)ioo->ioo_attr.ov_buf[0]);
 	m0_ivec_cursor_init(&cursor, &ioo->ioo_ext);
-	if (bufvec)
+	if (bufvec) 
 		m0_bufvec_cursor_init(&buf_cursor, &ioo->ioo_data);
+
+	M0_LOG(M0_DEBUG, "YJC: Reading cksum buffer cksum = %s", (char *)ioo->ioo_attr.ov_buf[0]);
+	nbytes = m0_vec_count(&ioo->ioo_attr.ov_vec);
+	attr_databuf=m0_alloc(nbytes);
+	ioo->ioo_attr_di = (struct m0_bufvec) M0_BUFVEC_INIT_BUF(&attr_databuf, &nbytes);
+	m0_bufvec_cursor_init(&attr_cursor, &ioo->ioo_attr_di);
+        nbytes_copied = m0_bufvec_cursor_copyto(&attr_cursor,
+                                                (void *)ioo->ioo_attr.ov_buf[0],
+                                                nbytes);
+	M0_ASSERT(nbytes_copied == nbytes);
+
 	/*
 	 * cursor is advanced maximum by parity group size in one iteration
 	 * of this loop.
@@ -919,7 +933,9 @@ static int ioreq_iomaps_prepare(struct m0_op_io *ioo)
 		M0_LOG(M0_INFO, "YJC: pargrp_iomap id : %"PRIu64" populated",
 		       ioo->ioo_iomaps[i]->pi_grpid);
 	}
+	
 
+	M0_LOG(M0_DEBUG, "YJC: Reading cksum buffer cksum = %s", (char *)ioo->ioo_attr_di.ov_buf[0]);
 	return M0_RC(0);
 failed:
 	if (ioo->ioo_iomaps != NULL)

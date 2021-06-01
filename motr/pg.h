@@ -183,6 +183,7 @@ struct data_buf {
 	 * by incoming rmw request.
 	 */
 	struct m0_buf        db_auxbuf;
+	struct m0_bufvec     db_attrbuf;
 
 	/**
 	 * Miscellaneous flags.
@@ -803,6 +804,7 @@ struct target_ioreq {
 	 */
 	struct m0_bufvec               ti_bufvec;
 	struct m0_bufvec               ti_auxbufvec;
+	struct m0_bufvec               ti_attrbufvec;
 
 	/**
 	 * Degraded mode read/write IO vector.

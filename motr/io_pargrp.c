@@ -829,6 +829,7 @@ static int pargrp_iomap_seg_process(struct pargrp_iomap *map,
 		M0_ASSERT(row <= map->pi_max_row);
 
 		if (start < skip_buf_index) {
+			M0_LOG(M0_DEBUG, "allocating with skip buf row = %d col = %d", row, col);
 			rc = map->pi_ops->pi_databuf_alloc(map, row, col, NULL);
 		} else {
 			/*
@@ -840,6 +841,7 @@ static int pargrp_iomap_seg_process(struct pargrp_iomap *map,
 			 * internally. So set buf_cursor to NULL when the cursor
 			 * reaches the end of application's buffer.
 			 */
+			M0_LOG(M0_DEBUG, "allocating with buf row = %d col = %d step = %"PRIu64, row, col, m0_bufvec_cursor_step(buf_cursor));
 			if (buf_cursor && m0_bufvec_cursor_move(buf_cursor, 0))
 				buf_cursor = NULL;
 			rc = map->pi_ops->pi_databuf_alloc(map, row, col,
@@ -893,8 +895,10 @@ static int pargrp_iomap_databuf_alloc(struct pargrp_iomap     *map,
 	struct data_buf      *buf;
 	uint64_t              flags;
 	void                 *addr = NULL; /* required */
+	uint32_t              nbytes_copied;
+	int		      i, nr_seg = 1;
 
-	M0_ENTRY("YJC: row %u col %u", row, col);
+	M0_ENTRY("YJC: [%p] row %u col %u", map, row, col);
 
 	M0_PRE(map != NULL);
 	M0_PRE(col <= map->pi_max_col);
@@ -920,6 +924,14 @@ static int pargrp_iomap_databuf_alloc(struct pargrp_iomap     *map,
 		flags = PA_NONE;
 	}
 
+	/* nbytes_copied = m0_bufvec_alloc(&buf->db_attrbuf, map->pi_ioo->ioo_attr_di.ov_vec.v_nr,
+					  map->pi_ioo->ioo_attr_di.ov_vec.v_count[0]); */
+	nbytes_copied = m0_bufvec_alloc(&buf->db_attrbuf, nr_seg, 128);
+	M0_LOG(M0_DEBUG, "YJC: Allocating di seg nr = %"PRIu32 "seg size =%"PRIu64 "nbytes copied = %"PRIu32, buf->db_attrbuf.ov_vec.v_nr, buf->db_attrbuf.ov_vec.v_count[0], nbytes_copied);
+	for (i=0; i<nr_seg; i++) {
+		sprintf(buf->db_attrbuf.ov_buf[i], "%sseg%d%"PRIu64, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", i, m0_bufvec_cursor_step(data));	
+		M0_LOG(M0_DEBUG, "YJC: ov buf = %s", (char *)buf->db_attrbuf.ov_buf[i]);
+	}
 	data_buf_init(buf, addr, obj_buffer_size(obj), flags);
 	M0_POST_EX(data_buf_invariant(buf));
 	map->pi_databufs[row][col] = buf;

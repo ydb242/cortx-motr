@@ -265,6 +265,7 @@ struct m0_op_io {
 	struct m0_indexvec                ioo_ext;
 	struct m0_bufvec                  ioo_data;
 	struct m0_bufvec                  ioo_attr;
+	struct m0_bufvec                  ioo_attr_di;
 	uint64_t                          ioo_attr_mask;
 	/** A bit-mask of m0_op_obj_flags. */
 	uint32_t                          ioo_flags;
