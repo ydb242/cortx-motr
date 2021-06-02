@@ -183,7 +183,7 @@ struct data_buf {
 	 * by incoming rmw request.
 	 */
 	struct m0_buf        db_auxbuf;
-	struct m0_bufvec     db_attrbuf;
+	struct m0_buf        db_attrbuf;
 
 	/**
 	 * Miscellaneous flags.

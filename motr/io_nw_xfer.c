@@ -748,6 +748,38 @@ static void irfop_fini(struct ioreq_fop *irfop)
 	M0_LEAVE();
 }
 
+static int m0_bufs_from_bufvec(struct m0_bufs *dest,
+		                    const struct m0_bufvec *src)
+{
+	size_t i;
+
+	M0_SET0(dest);
+
+	if (src == NULL)
+		return 0;
+
+	dest->ab_count = src->ov_vec.v_nr;
+	if (dest->ab_count == 0)
+		return 0;
+
+	M0_ALLOC_ARR(dest->ab_elems, dest->ab_count);
+	if (dest->ab_elems == NULL)
+		return M0_ERR(-ENOMEM);
+
+	for (i = 0; i < dest->ab_count; ++i) {
+		struct m0_buf *dst = &dest->ab_elems[i];
+		uint32_t count;
+		count = src->ov_vec.v_count[i];
+		dst->b_addr = m0_alloc(count);
+		if (dst->b_addr == NULL)
+			return M0_ERR(-ENOMEM);
+		dst->b_nob = count;
+		memcpy(dst->b_addr, src->ov_buf[i], count);
+	}
+	return 0;
+}
+
+
 /**
  * Assembles io fops for the specified target server.
  * This is heavily based on
@@ -945,7 +977,10 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		rw_fop->crw_pver = ioo->ioo_pver;
 		rw_fop->crw_index = ti->ti_obj;
 		attrbvec = &ti->ti_attrbufvec;
-		rw_fop->crw_di_data_cksum = attrbvec;
+		rc = m0_bufs_from_bufvec(&rw_fop->crw_di_data_cksum, attrbvec);
+		M0_ASSERT(rc == 0);
+		//snprintf(rw_fop->crw_di_data_cksum, 30, "%s", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+		m0_bufvec_print(attrbvec);
 
 		if (ioo->ioo_flags & M0_OOF_NOHOLE)
 			rw_fop->crw_flags |= M0_IO_FLAG_NOHOLE;
