@@ -130,23 +130,22 @@ static struct m0_rwlock *emap_rwlock(struct m0_be_emap *emap)
 	return &emap->em_lock.bl_u.rwlock;
 }
 
-static void key_print(const struct m0_be_emap_key *k)
-{
-	M0_LOG(M0_DEBUG, U128X_F " YJC offset= %"PRIu64" ", U128_P(&k->ek_prefix), k->ek_offset);
-	//M0_LOG(M0_DEBUG, "YJC: "U128X_F":" "PRIu64", U128_P(&k->ek_prefix), k->ek_offset);
-}
+#define key_print(k) \
+do {\
+	M0_LOG(M0_DEBUG, "YJC: ek_prefix = "U128X_F " ek_offset= %"PRIu64" ", U128_P(&(k)->ek_prefix), (k)->ek_offset); \
+}while(0)
 
-static void rec_print(const struct m0_be_emap_rec *r)
-{
-        M0_LOG(M0_DEBUG, "YJC: start=%"PRIu64" "  "er_value=%"PRIu64,
-			 r->er_start, r->er_value);
-}
+#define rec_print(r) \
+do { \
+        M0_LOG(M0_DEBUG, "YJC: er_start=%"PRIu64" "  "er_value=%"PRIu64, \
+			 (r)->er_start, (r)->er_value); \
+}while(0)
 
-static void extent_print(const struct m0_ext *e)
-{
-        M0_LOG(M0_DEBUG, "YJC: start=%"PRIu64" "  "end=%"PRIu64,
-			 e->e_start, e->e_end);
-}
+#define extent_print(e) \
+do {\
+        M0_LOG(M0_DEBUG, "YJC: e_start=%"PRIu64" "  "e_end=%"PRIu64, \
+			 (e)->e_start, (e)->e_end); \
+}while(0)
 
 
 static void emap_dump(struct m0_be_emap_cursor *it)

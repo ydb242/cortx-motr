@@ -568,7 +568,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 			attr_idx = row;
 
 			pattr[seg] |= PA_DATA;
-			M0_LOG(M0_DEBUG, "YJC: Data seg %u row - %u col = %u added", row, col, seg);
+			M0_LOG(M0_DEBUG, "YJC: Data seg %u row - %u col = %u added", seg, row, col);
 		} else {
 			buf = map->pi_paritybufs[page_id(goff, ioo->ioo_obj)]
 			[unit - layout_n(play)];
@@ -626,7 +626,8 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		goff += COUNT(ivec, seg);
 		++ivec->iv_vec.v_nr;
 		pgstart = pgend;
-//		M0_LOG(M0_DEBUG, "YJC: goff %"PRIu64", count %"PRIu64" pgstart = %"PRIu64",pgend = %"PRIu64, goff, ivec->iv_vec.v_nr, pgstart, pgend);
+		//M0_LOG(M0_DEBUG, "YJC: goff %"PRIu64", count %"PRIu64" pgstart = %"PRIu64",pgend = %"PRIu64, goff, ivec->iv_vec.v_nr, pgstart, pgend);
+		M0_LOG(M0_DEBUG, "YJC: goff %"PRIu64 " ivec cnt = %d", goff, ivec->iv_vec.v_nr);
 		//M0_LOG(M0_DEBUG, "YJC: goff %"PRIu64" v_nr %"PRIu64, goff, ivec->iv_vec.v_nr);
 	}
 	M0_LEAVE();
@@ -970,6 +971,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 			irfop_fini(irfop);
 			continue;
 		}
+		M0_LOG(M0_DEBUG, "YJC: segment = %d", seg);
 
 		rbuf->bb_nbuf->nb_buffer.ov_vec.v_nr = bbsegs;
 		rbuf->bb_zerovec.z_bvec.ov_vec.v_nr = bbsegs;
@@ -980,6 +982,8 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		attrbvec = &ti->ti_attrbufvec;
 		rc = m0_bufs_from_bufvec(&rw_fop->crw_di_data_cksum, attrbvec);
 		M0_ASSERT(rc == 0);
+		M0_LOG(M0_DEBUG, "YJC: crw_di_data_cksum ab_count = %d ti_attrbufvec v_nr = %d ",
+				 rw_fop->crw_di_data_cksum.ab_count, attrbvec->ov_vec.v_nr);
 		//snprintf(rw_fop->crw_di_data_cksum, 30, "%s", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 		m0_bufvec_print(attrbvec);
 
@@ -1117,7 +1121,7 @@ static int target_ioreq_init(struct target_ioreq    *ti,
 	target_ioreq_bob_init(ti);
 
 	nr = page_nr(size, ioo->ioo_obj);
-	M0_LOG(M0_DEBUG, "YJC: %"PRIu32 "pages allocated for ivec for size = %"PRIu64, nr, size);
+	M0_LOG(M0_DEBUG, "YJC: %"PRIu32 " pages allocated for ivec for size = %"PRIu64, nr, size);
 	rc = m0_indexvec_alloc(&ti->ti_ivec, nr);
 	if (rc != 0)
 		goto out;
