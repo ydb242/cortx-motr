@@ -1775,8 +1775,11 @@ static int io_launch(struct m0_fom *fom)
 			uint32_t di_size = m0_di_size_get(file, ivec_count);
 			uint32_t curr_pos = m0_di_size_get(file,
 						fom_obj->fcrw_curr_size);
-			struct m0_buf *buf;
-			char   *msg;
+			struct   m0_bufs *bufs;
+			struct   m0_buf  *buf_a;
+			char             *msg;
+			int               i = 0;
+
 
 			di_buf = &rwfop->crw_di_data;
 			if (di_buf != NULL) {
@@ -1789,9 +1792,12 @@ static int io_launch(struct m0_fom *fom)
 					  mem_ivec, &nb->nb_buffer,
 					  &cksum_data));
 			}
-			buf = &rwfop->crw_di_data_cksum.ab_elems[0];
-			msg = (char *)buf->b_addr;
-			M0_LOG(M0_DEBUG, "YJC: print cksum buffer %s", msg);
+			bufs = &rwfop->crw_di_data_cksum;
+			for (i=0; i<bufs->ab_count; i++) {
+				buf_a = &bufs->ab_elems[i];
+				msg = (char *)buf_a->b_addr;
+				M0_LOG(M0_DEBUG, "YJC: print cksum buffer[%d] %s", i, msg);
+			}
 			//m0_bufvec_print(rwfop->crw_di_data_cksum);
 		}
 		stio->si_opcode = m0_is_write_fop(fop) ? SIO_WRITE : SIO_READ;

@@ -896,8 +896,8 @@ static int pargrp_iomap_databuf_alloc(struct pargrp_iomap     *map,
 	uint64_t              flags;
 	void                 *addr = NULL; /* required */
 	void                 *addr_attr = NULL; /* required */
-	uint32_t              nbytes_copied;
-	int		      i, nr_seg = 1;
+	int                   attr_size = 128;
+	char                 *str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 	M0_ENTRY("YJC: [%p] row %u col %u", map, row, col);
 
@@ -915,7 +915,7 @@ static int pargrp_iomap_databuf_alloc(struct pargrp_iomap     *map,
 	}
 
 	if (data)
-		addr = m0_b_attrufvec_cursor_addr(data);
+		addr = m0_bufvec_cursor_addr(data);
 
 	M0_LOG(M0_DEBUG, "Before network align addr = %p", addr);
 	flags = PA_NONE | PA_APP_MEMORY;
@@ -928,6 +928,14 @@ static int pargrp_iomap_databuf_alloc(struct pargrp_iomap     *map,
 	}
 
 	data_buf_init(buf, addr, obj_buffer_size(obj), flags);
+	addr_attr = m0_alloc_aligned(attr_size,
+			        M0_NETBUF_SHIFT);
+	if (addr_attr == NULL) {
+		M0_LOG(M0_ERROR, "Failed to allocate attr_buf");
+		return M0_ERR(-ENOMEM);
+	}
+	sprintf(addr_attr, "%sseg_%"PRIu64, str, m0_bufvec_cursor_step(data));
+	m0_buf_init(&buf->db_attrbuf, addr_attr, attr_size);
 	M0_POST_EX(data_buf_invariant(buf));
 	map->pi_databufs[row][col] = buf;
 

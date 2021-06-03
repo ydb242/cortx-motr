@@ -600,8 +600,8 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		bvec->ov_buf[seg] = buf->db_buf.b_addr;
 		bvec->ov_vec.v_count[seg] = COUNT(ivec, seg);
 		M0_LOG(M0_DEBUG, "YJC: Writing target vector for seg %d from %d", seg, attr_idx);
-		attrbvec->ov_buf[seg] = buf->db_attrbuf.ov_buf[attr_idx];
-		attrbvec->ov_vec.v_count[seg] = buf->db_attrbuf.ov_vec.v_count[seg];
+		attrbvec->ov_buf[seg] = buf->db_attrbuf.b_addr;
+		attrbvec->ov_vec.v_count[seg] = buf->db_attrbuf.b_nob;
 		M0_LOG(M0_DEBUG, "YJC: target buffer ov buf = %s", (char *)attrbvec->ov_buf[seg]);
 		if (map->pi_rtype == PIR_READOLD &&
 		    unit_type == M0_PUT_DATA) {
@@ -766,6 +766,7 @@ static int m0_bufs_from_bufvec(struct m0_bufs *dest,
 	if (dest->ab_elems == NULL)
 		return M0_ERR(-ENOMEM);
 
+	M0_LOG(M0_DEBUG, "YJC: copying %d buffers", dest->ab_count);
 	for (i = 0; i < dest->ab_count; ++i) {
 		struct m0_buf *dst = &dest->ab_elems[i];
 		uint32_t count;
