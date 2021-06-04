@@ -210,13 +210,13 @@ M0_INTERNAL int m0_bufvec_extend(struct m0_bufvec *bufvec,
 				 uint32_t num_segs);
 
 //M0_INTERNAL bool m0_bufvec_print(struct m0_bufvec *buf);
-#define m0_bufvec_print(buf) \
+#define m0_bufvec_print(buf, msg) \
 do { \
 	uint32_t i;\
 	struct m0_vec *vec = &(buf)->ov_vec; \
 	for (i = 0; i < vec->v_nr; ++i) { \
 		if (vec->v_count[i] > 0) { \
-			M0_LOG(M0_DEBUG, "YJC: count[%d] = %"PRIu64 "ov buf = %s", \
+			M0_LOG(M0_DEBUG, msg " count[%d] = %"PRIu64 "ov buf = %s", \
 				i, vec->v_count[i], (char *)(buf)->ov_buf[i]); \
 		} \
 	} \

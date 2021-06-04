@@ -468,9 +468,9 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 {
 	uint32_t                   seg;
 	uint32_t                   tseg;
+	uint32_t                   coff;
 	m0_bindex_t                toff;
 	m0_bindex_t                goff;
-	m0_bindex_t                coff;
 	m0_bindex_t                pgstart;
 	m0_bindex_t                pgend;
 	struct data_buf           *buf;
@@ -517,7 +517,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	pgstart = toff;
 	goff    = unit_type == M0_PUT_DATA ? gob_offset : 0;
 	coff    = di_cksum_offset(play, gob_offset);
-	M0_LOG(M0_DEBUG, "YJC: coff = %"PRIu64, coff);
+	M0_LOG(M0_DEBUG, "YJC: coff = %"PRIu32, coff);
 	M0_LOG(M0_DEBUG, "YJC: goff =%"PRIu64
 			" unit_size = %"PRIu64,
 			gob_offset, layout_unit_size(play));
@@ -608,10 +608,10 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		bvec->ov_buf[seg] = buf->db_buf.b_addr;
 		bvec->ov_vec.v_count[seg] = COUNT(ivec, seg);
 		M0_LOG(M0_DEBUG, "YJC: Writing target vector for seg %d from %d", seg, attr_idx);
-		attrbvec->ov_buf[seg] = buf->db_attrbuf.b_addr;
-		/*M0_LOG(M0_DEBUG, "YJC: ioo->cksum = %s",
-				  (char *)ioo->ioo_attr.ov_buf[coff]); */
-		attrbvec->ov_vec.v_count[seg] = buf->db_attrbuf.b_nob;
+		attrbvec->ov_buf[seg] = ioo->ioo_attr.ov_buf[coff];
+		attrbvec->ov_vec.v_count[seg] = ioo->ioo_attr.ov_vec.v_count[coff];
+		M0_LOG(M0_DEBUG, "YJC_CKSUM: ioo->cksum = %s target buf cksum = %s gob_offset %"PRIu64 " coff = %d",
+				  (char *)ioo->ioo_attr.ov_buf[coff], (char *)attrbvec->ov_buf[seg], gob_offset, coff);
 		M0_LOG(M0_DEBUG, "YJC: target buffer ov buf = %s", (char *)attrbvec->ov_buf[seg]);
 		if (map->pi_rtype == PIR_READOLD &&
 		    unit_type == M0_PUT_DATA) {
@@ -995,7 +995,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		M0_LOG(M0_DEBUG, "YJC: crw_di_data_cksum ab_count = %d ti_attrbufvec v_nr = %d ",
 				 rw_fop->crw_di_data_cksum.ab_count, attrbvec->ov_vec.v_nr);
 		//snprintf(rw_fop->crw_di_data_cksum, 30, "%s", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-		m0_bufvec_print(attrbvec);
+		m0_bufs_print(&rw_fop->crw_di_data_cksum, "YJC_CKSUM: rw_fop->crw_di_data_cksum");
 
 		if (ioo->ioo_flags & M0_OOF_NOHOLE)
 			rw_fop->crw_flags |= M0_IO_FLAG_NOHOLE;

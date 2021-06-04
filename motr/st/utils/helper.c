@@ -37,6 +37,7 @@
 #include "lib/getopts.h"
 #include "motr/client_internal.h"
 
+#define ATTR_BUF_CNT 8
 extern struct m0_addb_ctx m0_addb_ctx;
 
 static int noop_lock_init(struct m0_obj *obj)
@@ -111,12 +112,13 @@ static int alloc_vecs(struct m0_indexvec *ext, struct m0_bufvec *data,
 	 */
 
 	fprintf(stderr, "YJC: allocating data and att for %d blocks of size %d\n", block_count, block_size);
+	//block_count = block_size /  lid_size;
 	rc = m0_bufvec_alloc(data, block_count, block_size);
 	if (rc != 0) {
 		m0_indexvec_free(ext);
 		return rc;
 	}
-	rc = m0_bufvec_alloc(attr, block_count, 128);
+	rc = m0_bufvec_alloc(attr, ATTR_BUF_CNT, 128);
 	if (rc != 0) {
 		m0_indexvec_free(ext);
 		m0_bufvec_free(data);
@@ -131,10 +133,12 @@ static int write_dummy_hash_data(struct m0_bufvec *attr)
        int nr_blocks;
 
        nr_blocks = attr->ov_vec.v_nr;
-
+       fprintf(stderr, "YJC: attr buf cnt = %d\n", nr_blocks);
        for (i = 0; i < nr_blocks; ++i) {
+	       //fprintf(stderr, "YJC: sending attr buffer for seg %d\n", i);
 	       sprintf(attr->ov_buf[i], "%s_seg%d", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 					       i);
+	       fprintf(stderr, "YJC_CKSUM: attr[%d] = %s \n", i, (char *)attr->ov_buf[i]);
        }
        return i;
 }
@@ -283,6 +287,7 @@ static int read_data_from_file(FILE *fp, struct m0_bufvec *data)
 
 	nr_blocks = data->ov_vec.v_nr;
 	for (i = 0; i < nr_blocks; ++i) {
+		fprintf(stderr, "YJC: reading data buffer %d from file\n", i);
 		rc = fread(data->ov_buf[i], data->ov_vec.v_count[i], 1, fp);
 		if (rc != 1)
 			break;

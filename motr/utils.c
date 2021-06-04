@@ -136,7 +136,7 @@ M0_INTERNAL uint64_t target_offset(uint64_t                  frame,
 		(gob_offset % layout_unit_size(play));
 }
 
-M0_INTERNAL uint64_t di_cksum_offset(struct m0_pdclust_layout *play,
+M0_INTERNAL uint32_t di_cksum_offset(struct m0_pdclust_layout *play,
 				   m0_bindex_t               gob_offset)
 {
 	M0_PRE(play != NULL);
