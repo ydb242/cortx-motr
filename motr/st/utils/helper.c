@@ -110,12 +110,13 @@ static int alloc_vecs(struct m0_indexvec *ext, struct m0_bufvec *data,
 	 * and initialises the bufvec for us.
 	 */
 
+	fprintf(stderr, "YJC: allocating data and att for %d blocks of size %d\n", block_count, block_size);
 	rc = m0_bufvec_alloc(data, block_count, block_size);
 	if (rc != 0) {
 		m0_indexvec_free(ext);
 		return rc;
 	}
-	rc = m0_bufvec_alloc(attr, 1, 32);
+	rc = m0_bufvec_alloc(attr, block_count, 128);
 	if (rc != 0) {
 		m0_indexvec_free(ext);
 		m0_bufvec_free(data);
@@ -132,9 +133,8 @@ static int write_dummy_hash_data(struct m0_bufvec *attr)
        nr_blocks = attr->ov_vec.v_nr;
 
        for (i = 0; i < nr_blocks; ++i) {
-	       //snprintf((char *)attr->ov_buf[i], "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 31);
-	       snprintf(attr->ov_buf[i], 30, "%s", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-               //memcpy(attr->ov_buf[i], "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 32);
+	       sprintf(attr->ov_buf[i], "%s_seg%d", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					       i);
        }
        return i;
 }
@@ -427,6 +427,7 @@ int m0_write(struct m0_container *container, char *src,
 	rc = alloc_vecs(&ext, &data, &attr, blks_per_io, block_size);
 	if (rc != 0)
 		goto cleanup;
+	fprintf(stderr, "YJC: blks_per_io = %d block_size = %d", blks_per_io, block_size);
 
 	while (block_count > 0) {
 		bcount = (block_count > blks_per_io)?

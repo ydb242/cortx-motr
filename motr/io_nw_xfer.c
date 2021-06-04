@@ -470,6 +470,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	uint32_t                   tseg;
 	m0_bindex_t                toff;
 	m0_bindex_t                goff;
+	m0_bindex_t                coff;
 	m0_bindex_t                pgstart;
 	m0_bindex_t                pgend;
 	struct data_buf           *buf;
@@ -515,6 +516,11 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	toff    = target_offset(frame, play, gob_offset);
 	pgstart = toff;
 	goff    = unit_type == M0_PUT_DATA ? gob_offset : 0;
+	coff    = di_cksum_offset(play, gob_offset);
+	M0_LOG(M0_DEBUG, "YJC: coff = %"PRIu64, coff);
+	M0_LOG(M0_DEBUG, "YJC: goff =%"PRIu64
+			" unit_size = %"PRIu64,
+			gob_offset, layout_unit_size(play));
 
 	M0_LOG(M0_DEBUG,
 	       "YJC: [gpos %"PRIu64", count %"PRIu64"] [%"PRIu64", %"PRIu64"]"
@@ -546,6 +552,8 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 				 ioo->ioo_iomap_nr, ioreq_sm_state(ioo), cnt);
 	}
 
+	M0_LOG(M0_DEBUG, "YJC ivec: v_nr = %d count = %"PRIu64,
+			SEG_NR(ivec), m0_vec_count(&ivec->iv_vec));
 	//YJC: Move this to above else section during io write
 	attrbvec = &ti->ti_attrbufvec;
 	while (pgstart < toff + count) {
@@ -601,6 +609,8 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		bvec->ov_vec.v_count[seg] = COUNT(ivec, seg);
 		M0_LOG(M0_DEBUG, "YJC: Writing target vector for seg %d from %d", seg, attr_idx);
 		attrbvec->ov_buf[seg] = buf->db_attrbuf.b_addr;
+		/*M0_LOG(M0_DEBUG, "YJC: ioo->cksum = %s",
+				  (char *)ioo->ioo_attr.ov_buf[coff]); */
 		attrbvec->ov_vec.v_count[seg] = buf->db_attrbuf.b_nob;
 		M0_LOG(M0_DEBUG, "YJC: target buffer ov buf = %s", (char *)attrbvec->ov_buf[seg]);
 		if (map->pi_rtype == PIR_READOLD &&
@@ -1333,6 +1343,7 @@ static int nw_xfer_io_distribute(struct nw_xfer_request *xfer)
 			unit = (m0_ivec_cursor_index(&cursor) - pgstart) /
 				unit_size;
 			M0_LOG(M0_DEBUG, "unit = %"PRIu64" pgstart = %"PRIu64, unit, pgstart);
+			M0_LOG(M0_DEBUG, "curr index = %"PRIu64 " iomap = %"PRIu64, m0_ivec_cursor_index(&cursor), i);
 
 			u_ext.e_start = pgstart + unit * unit_size;
 			u_ext.e_end   = u_ext.e_start + unit_size;
