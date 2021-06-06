@@ -748,7 +748,9 @@ int m0_obj_op(struct m0_obj       *obj,
 	struct m0_io_args          io_args;
 	enum m0_client_layout_type type;
 
-	M0_ENTRY("YJC: obj_id: " U128X_F, U128_P(&obj->ob_entity.en_id));
+	M0_ENTRY("YJC: obj_id: " U128X_F "opcode = %s", U128_P(&obj->ob_entity.en_id),
+		 opcode == M0_OC_READ ? "read" : opcode == M0_OC_WRITE ? "write" :  \
+		 opcode == M0_OC_FREE ? "free" : "Not known");
 	M0_PRE(obj != NULL);
 	M0_PRE(op != NULL);
 	M0_PRE(ergo(opcode == M0_OC_READ, M0_IN(flags, (0, M0_OOF_NOHOLE))));
@@ -783,7 +785,7 @@ int m0_obj_op(struct m0_obj       *obj,
 		layout_alloc = true;
 	}
 
-        M0_LOG(M0_DEBUG, "YJC: Reading cksum buffer cksum = %s", (char *)attr->ov_buf[0]); 
+        M0_LOG(M0_DEBUG, "YJC: Reading cksum buffer cksum = %s", (char *)attr->ov_buf[0]);
 	/* Build object's IO requests using its layout. */
 	obj_io_args_check(obj, opcode, ext, data, attr, mask);
 	segments_sort(ext, data, attr);
