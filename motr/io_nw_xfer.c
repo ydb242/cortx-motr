@@ -785,7 +785,10 @@ static int m0_buf_from_bufvec(struct m0_buf *dest,
 		return M0_ERR(-ENOMEM);
 	dst = dest->b_addr;
 	for (i = 0; i < src->ov_vec.v_nr; ++i) {
+		char str[128];
 		len = src->ov_vec.v_count[i];
+		snprintf(str, len, "%s", (char *) src->ov_buf[i]);
+		M0_LOG(M0_DEBUG, "YJC_TEST: dst = %p %s len = %d", dst, (char *)str, (int)len);
 		memcpy(dst, src->ov_buf[i], len);
 		dst += len;
 	}
@@ -793,7 +796,7 @@ static int m0_buf_from_bufvec(struct m0_buf *dest,
 	//M0_ASSERT(count == len);
 	//YJC_TODO: remove below two lines, only for debug
 	*((char *)dst + len) = '\0';
-	M0_LOG(M0_DEBUG, "YJC: copying %s buffers", (char *)dst);
+	M0_LOG(M0_DEBUG, "YJC: copying %s buffers", (char *)dest->b_addr);
 	return 0;
 }
 
