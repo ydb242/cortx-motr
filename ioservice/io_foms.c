@@ -1693,6 +1693,7 @@ static int io_launch(struct m0_fom *fom)
 	struct m0_net_buffer    *nb;
 	struct m0_fop_cob_rw    *rwfop;
 	struct m0_file          *file = NULL;
+	//struct m0_bufs          *bufs;
 	uint32_t                 index;
 
 	M0_PRE(fom != NULL);
@@ -1738,6 +1739,12 @@ static int io_launch(struct m0_fom *fom)
 	index -= m0_is_write_fop(fop) ?
 		netbufs_tlist_length(&fom_obj->fcrw_netbuf_list) : 0;
 
+	//bufs = &rwfop->crw_di_data_cksum;
+	if (m0_is_write_fop(fop)) {
+		M0_LOG(M0_DEBUG, "YJC: todo dummy messages");
+		//m0_bufs_print(&rwfop->crw_di_data_cksum, "YJC_CKSUM: rw_fop->crw_di_data_cksum");
+	}
+
 	m0_tl_for(netbufs, &fom_obj->fcrw_netbuf_list, nb) {
 		struct m0_indexvec     *mem_ivec;
 		struct m0_stob_io_desc *stio_desc;
@@ -1775,7 +1782,6 @@ static int io_launch(struct m0_fom *fom)
 			uint32_t di_size = m0_di_size_get(file, ivec_count);
 			uint32_t curr_pos = m0_di_size_get(file,
 						fom_obj->fcrw_curr_size);
-			struct   m0_bufs *bufs;
 			//struct   m0_buf  *buf_a;
 			//char             *msg;
 			//int               i = 0;
@@ -1792,13 +1798,11 @@ static int io_launch(struct m0_fom *fom)
 					  mem_ivec, &nb->nb_buffer,
 					  &cksum_data));
 			}
-			bufs = &rwfop->crw_di_data_cksum;
 			/* for (i=0; i<bufs->ab_count; i++) {
 				buf_a = &bufs->ab_elems[i];
 				msg = (char *)buf_a->b_addr;
 				M0_LOG(M0_DEBUG, "YJC: print cksum buffer[%d] %s", i, msg);
 			} */
-			m0_bufs_print(bufs, "YJC_CKSUM: rw_fop->crw_di_data_cksum");
 			//m0_bufvec_print(rwfop->crw_di_data_cksum);
 		}
 		stio->si_opcode = m0_is_write_fop(fop) ? SIO_WRITE : SIO_READ;

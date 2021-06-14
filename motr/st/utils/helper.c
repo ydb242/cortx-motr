@@ -37,8 +37,10 @@
 #include "lib/getopts.h"
 #include "motr/client_internal.h"
 
-#define ATTR_BUF_CNT 8
 extern struct m0_addb_ctx m0_addb_ctx;
+enum {
+ATTR_SIZE = 128,
+};
 
 static int noop_lock_init(struct m0_obj *obj)
 {
@@ -118,7 +120,7 @@ static int alloc_vecs(struct m0_indexvec *ext, struct m0_bufvec *data,
 		m0_indexvec_free(ext);
 		return rc;
 	}
-	rc = m0_bufvec_alloc(attr, ATTR_BUF_CNT, 128);
+	rc = m0_bufvec_alloc(attr, block_count, ATTR_SIZE);
 	if (rc != 0) {
 		m0_indexvec_free(ext);
 		m0_bufvec_free(data);
@@ -127,18 +129,21 @@ static int alloc_vecs(struct m0_indexvec *ext, struct m0_bufvec *data,
 	return rc;
 }
 
-static int write_dummy_hash_data(struct m0_bufvec *attr)
+static int write_dummy_hash_data(struct m0_uint128 id, struct m0_bufvec *attr)
 {
        int i;
        int nr_blocks;
+       char str[128];
+       int len;
 
        nr_blocks = attr->ov_vec.v_nr;
        fprintf(stderr, "YJC: attr buf cnt = %d\n", nr_blocks);
        for (i = 0; i < nr_blocks; ++i) {
-	       //fprintf(stderr, "YJC: sending attr buffer for seg %d\n", i);
-	       sprintf(attr->ov_buf[i], "%s_seg%d", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					       i);
-	       fprintf(stderr, "YJC_CKSUM: attr[%d] = %s \n", i, (char *)attr->ov_buf[i]);
+		sprintf(str, U128X_F"seg%d", U128_P(&id), i);
+		len = strlen(str);
+		memcpy(attr->ov_buf[i], str, len);
+		attr->ov_vec.v_count[i] = len + 1;
+	        fprintf(stderr, "YJC_CKSUM: attr[%d] = %s len = %d\n", i, (char *)attr->ov_buf[i], len);
        }
        return i;
 }
@@ -156,7 +161,8 @@ static void prepare_ext_vecs(struct m0_indexvec *ext,
 		*last_index += block_size;
 
 		/* we don't want any attributes */
-		attr->ov_vec.v_count[i] = 32;
+		//YJC_TODO set count to block_count
+		attr->ov_vec.v_count[i] = 128;
 	}
 }
 
@@ -452,7 +458,7 @@ int m0_write(struct m0_container *container, char *src,
 		M0_ASSERT(rc == bcount);
 		fprintf(stderr, "YJC: writing dummy hash bcount = %d\n",
 		        bcount);
-		write_dummy_hash_data(&attr);
+		write_dummy_hash_data(id, &attr);
 
 		/* Copy data to the object*/
 		rc = write_data_to_object(&obj, &ext, &data, &attr);

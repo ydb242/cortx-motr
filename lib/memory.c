@@ -126,7 +126,7 @@ void *m0_alloc(size_t size)
 {
 	void *area;
 
-	M0_ENTRY("size=%zi", size);
+	//M0_ENTRY("size=%zi", size);
 	if (M0_FI_ENABLED("fail_allocation"))
 		return NULL;
 	area = m0_arch_alloc(size);
@@ -137,7 +137,7 @@ void *m0_alloc(size_t size)
 		M0_LOG(M0_ERROR, "Failed to allocate %zi bytes.", size);
 		m0_backtrace();
 	}
-	M0_LEAVE("ptr=%p size=%zi", area, size);
+//	M0_LEAVE("ptr=%p size=%zi", area, size);
 	return area;
 }
 M0_EXPORTED(m0_alloc);
@@ -147,7 +147,7 @@ void m0_free(void *data)
 	if (data != NULL) {
 		size_t size = m0_arch_alloc_size(data);
 
-		M0_LOG(M0_DEBUG, "%p", data);
+		//M0_LOG(M0_DEBUG, "%p", data);
 
 		if (DEV_MODE) {
 			m0_atomic64_sub(&allocated, size);
