@@ -908,6 +908,7 @@ M0_INTERNAL struct m0_rpc_bulk *m0_fop_to_rpcbulk(const struct m0_fop *fop)
 	M0_PRE(fop != NULL);
 
 	iofop = container_of(fop, struct m0_io_fop, if_fop);
+	M0_LOG(M0_DEBUG, "YJC_IOFOP: iofop = %p", iofop);
 	return &iofop->if_rbulk;
 }
 
@@ -1029,7 +1030,7 @@ M0_INTERNAL uint32_t m0_io_fop_segs_nr(struct m0_fop *fop, uint32_t index)
 	max_seg_size = m0_net_domain_get_max_buffer_segment_size(
 				m0_fop_domain_get(fop));
 	segs_nr = used_size / max_seg_size;
-	M0_LOG(M0_DEBUG, "segs_nr %d", segs_nr);
+	M0_LOG(M0_DEBUG, "YJC_IOFOP: used_size = %"PRIu64" segs_nr %d", used_size, segs_nr);
 
 	return segs_nr;
 }
@@ -1424,6 +1425,7 @@ static int io_fop_di_prepare(struct m0_fop *fop)
 
 		curr_pos = m0_di_size_get(file, curr_size);
 		todo = m0_vec_count(&rbuf->bb_zerovec.z_bvec.ov_vec);
+		M0_LOG(M0_DEBUG, "YJC:"FID_F" curr_pos =%"PRIu64 " todo = %"PRIu64, FID_P(&rw->crw_fid), curr_size, todo);
 		di_size = m0_di_size_get(file, todo);
 		buf = M0_BUF_INIT(di_size, rw->crw_di_data.b_addr + curr_pos);
 		cksum_data = (struct m0_bufvec) M0_BUFVEC_INIT_BUF(&buf.b_addr,
@@ -1480,7 +1482,7 @@ static int io_fop_desc_alloc(struct m0_fop *fop, struct m0_rpc_bulk *rbulk)
 	rbulk = m0_fop_to_rpcbulk(fop);
 	rw = io_rw_get(fop);
 	rw->crw_desc.id_nr = rpcbulk_tlist_length(&rbulk->rb_buflist);
-	M0_LOG(M0_DEBUG, "YJC: rpc buflist length %d", rw->crw_desc.id_nr);
+	M0_LOG(M0_DEBUG, "YJC_IOFOP: fop = %p rpc buflist length %d", fop, rw->crw_desc.id_nr);
 	M0_ALLOC_ARR(rw->crw_desc.id_descs, rw->crw_desc.id_nr);
 	return rw->crw_desc.id_descs == NULL ? M0_ERR(-ENOMEM) : 0;
 }
@@ -1512,12 +1514,13 @@ static void io_fop_desc_dealloc(struct m0_fop *fop)
  * Allocates memory for net buf descriptors array and index vector array
  * and populates the array of index vectors in io fop wire format.
  */
+//M0_INTERNAL int m0_io_fop_prepare(struct m0_fop *fop, struct target_ioreq *ti)
 M0_INTERNAL int m0_io_fop_prepare(struct m0_fop *fop)
 {
 	int		       rc;
 	struct m0_rpc_bulk    *rbulk;
 	enum m0_net_queue_type q;
-	M0_ENTRY();
+	M0_ENTRY("YJC_IOFOP: fop = %p", fop);
 
 	M0_PRE(fop != NULL);
 	M0_PRE(m0_is_io_fop(fop));

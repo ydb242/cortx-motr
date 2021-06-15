@@ -640,8 +640,10 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 		M0_LOG(M0_DEBUG, "YJC: goff %"PRIu64 " ivec cnt = %d", goff, ivec->iv_vec.v_nr);
 		//M0_LOG(M0_DEBUG, "YJC: goff %"PRIu64" v_nr %"PRIu64, goff, ivec->iv_vec.v_nr);
 	}
-	attrbvec->ov_buf[ti_idx] = ioo->ioo_attr.ov_buf[coff];
-	attrbvec->ov_vec.v_count[ti_idx] = ioo->ioo_attr.ov_vec.v_count[coff];
+	if (unit_type == M0_PUT_DATA) {
+		attrbvec->ov_buf[ti_idx] = ioo->ioo_attr.ov_buf[coff];
+		attrbvec->ov_vec.v_count[ti_idx] = ioo->ioo_attr.ov_vec.v_count[coff];
+	}
 	M0_LEAVE();
 }
 
@@ -767,6 +769,7 @@ static int m0_buf_from_bufvec(struct m0_buf *dest,
 	size_t i;
 	size_t count = 0;
 	size_t len = 0;
+	size_t bytes_copied = 0;
 	void *dst;
 
 	M0_SET0(dest);
@@ -778,25 +781,29 @@ static int m0_buf_from_bufvec(struct m0_buf *dest,
 		return 0;
 
 	count = m0_vec_count(&src->ov_vec);
-	M0_LOG(M0_DEBUG, "YJC: count = %d v_nr = %d", (int)count, src->ov_vec.v_nr);
 	//YJC_TODO : Need to free buffer
 	dest->b_addr = m0_alloc(count);
 	if (dest->b_addr == NULL)
 		return M0_ERR(-ENOMEM);
 	dst = dest->b_addr;
-	for (i = 0; i < src->ov_vec.v_nr; ++i) {
+	for (i = 0; i < src->ov_vec.v_nr; i++) {
 		char str[128];
 		len = src->ov_vec.v_count[i];
-		snprintf(str, len, "%s", (char *) src->ov_buf[i]);
-		M0_LOG(M0_DEBUG, "YJC_TEST: dst = %p %s len = %d", dst, (char *)str, (int)len);
-		memcpy(dst, src->ov_buf[i], len);
-		dst += len;
+		if(len > 0) {
+			snprintf(str, len, "%s", (char *) src->ov_buf[i]);
+			M0_LOG(M0_DEBUG, "YJC_LOG: dst = %p %s len = %d", dst, (char *)str, (int)len);
+			memcpy(dst, src->ov_buf[i], len);
+			dst += len;
+			bytes_copied += len;
+		}
 	}
-	dest->b_nob = count;
+	M0_LOG(M0_DEBUG, "YJC: count = %d v_nr = %d bytes_coped = %d", (int)count, src->ov_vec.v_nr, (int)bytes_copied);
+	dest->b_nob = bytes_copied;
 	//M0_ASSERT(count == len);
 	//YJC_TODO: remove below two lines, only for debug
-	*((char *)dst + len) = '\0';
-	M0_LOG(M0_DEBUG, "YJC: copying %s buffers", (char *)dest->b_addr);
+	*((char *)dst) = '\0';
+	++dest->b_nob;
+	M0_LOG(M0_DEBUG, "YJC: copying %d %s buffers", (int)len, (char *)dest->b_addr);
 	return 0;
 }
 
@@ -930,7 +937,9 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 			*/
 			if (pattr[seg] & rw && pattr[seg] & filter &&
 			    !(pattr[seg] & PA_TRUNC)) {
+				//YJC_TODO : add di_cksum size as well
 				delta += io_seg_size() + io_di_size(ioo);
+				M0_LOG(M0_DEBUG, "YJC: io_seg_size = %d io_di_size = %d\n", io_seg_size(), io_di_size(ioo));
 
 				if (filter == PA_DATA &&
 				    read_in_write &&
@@ -958,6 +967,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 						bbsegs;
 					bbsegs = 0;
 
+					//YJC_TODO : add di_cksum size as well
 					delta -= io_seg_size() - io_di_size(ioo);
 
 					/*
@@ -998,9 +1008,12 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		rw_fop->crw_fid = ti->ti_fid;
 		rw_fop->crw_pver = ioo->ioo_pver;
 		rw_fop->crw_index = ti->ti_obj;
-		attrbvec = &ti->ti_attrbufvec;
-		rc = m0_buf_from_bufvec(&rw_fop->crw_di_data_cksum, attrbvec);
-		M0_ASSERT(rc == 0);
+		if (filter == PA_DATA) {
+			attrbvec = &ti->ti_attrbufvec;
+			rc = m0_buf_from_bufvec(&rw_fop->crw_di_data_cksum, attrbvec);
+			M0_ASSERT(rc == 0);
+			M0_LOG(M0_DEBUG, "YJC_TEST:"FID_F" fop = %p baddr %p %s ", FID_P(&ti->ti_fid), &iofop->if_fop, rw_fop->crw_di_data_cksum.b_addr, (char *)rw_fop->crw_di_data_cksum.b_addr);
+		}
 		/* M0_LOG(M0_DEBUG, "YJC: crw_di_data_cksum ab_count = %d ti_attrbufvec v_nr = %d ",
 				 rw_fop->crw_di_data_cksum.ab_count, attrbvec->ov_vec.v_nr);
 		//m0_bufs_print(&rw_fop->crw_di_data_cksum, "YJC_CKSUM: rw_fop->crw_di_data_cksum");
@@ -1749,7 +1762,7 @@ static int nw_xfer_req_dispatch(struct nw_xfer_request *xfer)
 			rc = ioreq_fop_async_submit(&irfop->irf_iofop,
 						    ti->ti_session);
 			ri_error = irfop->irf_iofop.if_fop.f_item.ri_error;
-			M0_LOG(M0_DEBUG, "[%p] Submitted fop for device "
+			M0_LOG(M0_DEBUG, "YJC_IOFOP: [%p] Submitted fop for device "
 			       FID_F"@%p, item %p, fop_nr=%llu, rc=%d, "
 			       "ri_error=%d", ioo, FID_P(&ti->ti_fid), irfop,
 			       &irfop->irf_iofop.if_fop.f_item,

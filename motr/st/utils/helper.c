@@ -142,7 +142,7 @@ static int write_dummy_hash_data(struct m0_uint128 id, struct m0_bufvec *attr)
 		sprintf(str, U128X_F"seg%d", U128_P(&id), i);
 		len = strlen(str);
 		memcpy(attr->ov_buf[i], str, len);
-		attr->ov_vec.v_count[i] = len + 1;
+		attr->ov_vec.v_count[i] = len;
 	        fprintf(stderr, "YJC_CKSUM: attr[%d] = %s len = %d\n", i, (char *)attr->ov_buf[i], len);
        }
        return i;

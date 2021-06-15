@@ -1741,7 +1741,7 @@ static int io_launch(struct m0_fom *fom)
 
 	//bufs = &rwfop->crw_di_data_cksum;
 	if (m0_is_write_fop(fop)) {
-		M0_LOG(M0_DEBUG, "YJC: todo dummy messages");
+		M0_LOG(M0_DEBUG, "YJC_SRV:"FID_F "  %p %s baddr = %p nob= %"PRIu64, FID_P(&rwfop->crw_fid), rwfop, (char *)rwfop->crw_di_data_cksum.b_addr, rwfop->crw_di_data_cksum.b_addr, rwfop->crw_di_data_cksum.b_nob);
 		//m0_bufs_print(&rwfop->crw_di_data_cksum, "YJC_CKSUM: rw_fop->crw_di_data_cksum");
 	}
 
@@ -1766,6 +1766,7 @@ static int io_launch(struct m0_fom *fom)
 		 * Also trim network buffer as per I/O size.
 		 */
 		ivec_count = m0_vec_count(&mem_ivec->iv_vec);
+		M0_LOG(M0_DEBUG, "YJC ve count = %"PRIu64 "nblist = %d", ivec_count, (int)netbufs_tlist_length(&fom_obj->fcrw_netbuf_list));
 		rc = align_bufvec(fom, &stio->si_user, &nb->nb_buffer,
 				  ivec_count, fom_obj->fcrw_bshift);
 		if (rc != 0) {

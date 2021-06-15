@@ -523,10 +523,10 @@ M0_INTERNAL int ioreq_fop_async_submit(struct m0_io_fop      *iofop,
 	struct m0_fop_cob_rw *rwfop;
 	struct m0_rpc_item   *item;
 
-	M0_ENTRY("m0_io_fop %p m0_rpc_session %p", iofop, session);
 
 	M0_PRE(iofop != NULL);
 	M0_PRE(session != NULL);
+	M0_ENTRY("fop %p m0_rpc_session %p", &iofop->if_fop, session);
 
 	rwfop = io_rw_get(&iofop->if_fop);
 	M0_ASSERT(rwfop != NULL);
@@ -542,7 +542,7 @@ M0_INTERNAL int ioreq_fop_async_submit(struct m0_io_fop      *iofop,
 	item->ri_nr_sent_max = M0_RPC_MAX_RETRIES;
 	item->ri_resend_interval = M0_RPC_RESEND_INTERVAL;
 	rc = m0_rpc_post(item);
-	M0_LOG(M0_INFO, "IO fops submitted to rpc, rc = %d", rc);
+	M0_LOG(M0_INFO, "YJC: IO fops submitted to rpc, rc = %d", rc);
 
 	M0_ADDB2_ADD(M0_AVI_CLIENT_BULK_TO_RPC, iofop->if_rbulk.rb_id,
 		     m0_sm_id_get(&item->ri_sm));

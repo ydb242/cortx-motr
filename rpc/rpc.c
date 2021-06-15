@@ -65,7 +65,7 @@ M0_INTERNAL int m0_rpc_post(struct m0_rpc_item *item)
 	int                    rc;
 	struct m0_rpc_machine *machine;
 
-	M0_ENTRY("%p[%s/%u]", item, item_kind(item),
+	M0_ENTRY("YJC: %p[%s/%u]", item, item_kind(item),
 		 item->ri_type->rit_opcode);
 	M0_PRE(item->ri_session != NULL);
 	M0_PRE(m0_rpc_conn_is_snd(item2conn(item)));
