@@ -44,10 +44,12 @@
 
 /* sched client conf params */
 struct sched_conf {
-	char *local_addr;
-	char *ha_addr;
-	char *profile_fid;
-	char *process_fid;
+	char          *local_addr;
+	char          *ha_addr;
+	char          *profile_fid;
+	char          *process_fid;
+	char          *fdmi_plugin_fid_s;
+	struct m0_fid  fdmi_plugin_fid;
 } c_params;
 
 static struct m0_semaphore	sched_sem;

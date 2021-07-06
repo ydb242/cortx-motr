@@ -313,19 +313,20 @@ M0_INTERNAL void m0_dump_m0_fol_rec_to_json(struct m0_fol_rec *rec)
 
 		}
 	} m0_tl_endfor;
-
 }
 
 static void usage(void)
 {
 	m0_console_printf(
 		"Usage: m0sched "
-		"-l local_addr -h ha_addr -p profile_fid -f process_fid \n"
+		"-l local_addr -h ha_addr -p profile_fid -f process_fid "
+		"-g fdmi_plugin_fid\n"
 		"Use -? or -i for more verbose help on common arguments.\n"
 		"Usage example for common arguments: \n"
 		"m0sched -l 192.168.52.53@tcp:12345:4:1 "
 		"-h 192.168.52.53@tcp:12345:1:1 "
 		"-p 0x7000000000000001:0x37 -f 0x7200000000000001:0x19"
+		"-g 0x6c00000000000001:0x51"
 		"\n");
 }
 
@@ -366,13 +367,24 @@ sched_args_parse(struct sched_conf *params, int argc, char ** argv)
 			M0_STRINGARG('p', "Profile options for Client",
 					LAMBDA(void, (const char *str) {
 						params->profile_fid = (char*)str;
+					})),
+			M0_STRINGARG('g', "FDMI plugin fid",
+					LAMBDA(void, (const char *str) {
+						params->fdmi_plugin_fid_s =
+							(char*)str;
 					})));
 	if (rc != 0)
 		return M0_ERR(rc);
+	rc = m0_fid_sscanf(params->fdmi_plugin_fid_s, &params->fdmi_plugin_fid);
+	if (rc != 0) {
+		return M0_ERR_INFO(rc, "invalid format: fdmi_plugin_fid=%s",
+		                   params->fdmi_plugin_fid_s);
+	}
 	/* All mandatory params must be defined. */
 	if (rc == 0 &&
 	    (params->local_addr == NULL || params->ha_addr == NULL ||
-	     params->profile_fid == NULL || params->process_fid == NULL)) {
+	     params->profile_fid == NULL || params->process_fid == NULL ||
+	     params->fdmi_plugin_fid_s == NULL)) {
 		usage();
 		rc = M0_ERR(-EINVAL);
 	}
@@ -396,12 +408,6 @@ static int classify_handle_fdmi_rec_not(struct m0_uint128 *rec_id,
 
 	return rc;
 }
-
-// Plugin FID.
-static struct m0_fid CLASSIFY_PLUGIN_FID = {
-    .f_container = M0_FDMI_REC_TYPE_FOL,
-    .f_key = 0x1
-};
 
 const struct m0_fdmi_pd_ops *pdo;
 
@@ -434,7 +440,7 @@ static int fdmi_service_start(struct m0_client *m0c){
 	return M0_RC(rc);
 }
 
-static int init_fdmi_plugin()
+static int init_fdmi_plugin(struct sched_conf *conf)
 {
     int rc;
 
@@ -446,20 +452,20 @@ static int init_fdmi_plugin()
     };
 
     /* printf("Registering classify plugin."); */
-    rc = pdo->fpo_register_filter(&CLASSIFY_PLUGIN_FID, &fd, &pcb);
+    rc = pdo->fpo_register_filter(&conf->fdmi_plugin_fid, &fd, &pcb);
     printf("Plugin registration rc: %d\n", rc);
     if (rc < 0)
         goto end_fdmi_init;
 
     /* printf("Classify rc: %d", rc); */
-    pdo->fpo_enable_filters(true, &CLASSIFY_PLUGIN_FID, 1);
+    pdo->fpo_enable_filters(true, &conf->fdmi_plugin_fid, 1);
  end_fdmi_init:
     return rc;
 }
-static void deinit_plugin()
+static void deinit_plugin(struct sched_conf *conf)
 {
-	pdo->fpo_enable_filters(false, &CLASSIFY_PLUGIN_FID, 1);
-	pdo->fpo_deregister_plugin(&CLASSIFY_PLUGIN_FID, 1);
+	pdo->fpo_enable_filters(false, &conf->fdmi_plugin_fid, 1);
+	pdo->fpo_deregister_plugin(&conf->fdmi_plugin_fid, 1);
 
 }
 
@@ -531,16 +537,16 @@ static int sched_init(struct sched_conf *conf)
 
 	M0_POST(container.co_realm.re_instance != NULL);
 	uber_realm = container.co_realm;
-	rc = init_fdmi_plugin();
+	rc = init_fdmi_plugin(conf);
 	if (rc !=0)
 		goto do_exit;
 do_exit:
 	return rc;
 }
 
-static void sched_fini()
+static void sched_fini(struct sched_conf *conf)
 {
-	deinit_plugin();
+	deinit_plugin(conf);
 	//m0_reqh_service_stop(sched_fdmi_service);
 	m0_client_fini(m0c, true);
 }
@@ -600,7 +606,7 @@ int main(int argc, char **argv)
 
 	rc = sched_init(&c_params);
 	if (rc != 0) {
-		sched_fini();
+		sched_fini(&c_params);
 		return M0_ERR(errno);
 	}
 
@@ -612,7 +618,7 @@ int main(int argc, char **argv)
 	m0_semaphore_down(&sched_sem);
 sem_fini:
 	m0_semaphore_fini(&sched_sem);
-	sched_fini();
+	sched_fini(&c_params);
 	return M0_RC(rc < 0 ? -rc : rc);
 }
 
