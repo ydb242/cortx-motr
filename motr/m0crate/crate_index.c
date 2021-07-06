@@ -763,8 +763,10 @@ static int fill_kv_put(struct cr_idx_w *w,
 		       struct m0_fid *k, struct kv_pair *p, size_t nr,
 		       int kpart_one_size, char *kpart_one)
 {
+	static const char substring[] = "Bucket-Name";
 	int vlen;
 	int i;
+	int j;
 
 	p->k = idx_bufvec_alloc(nr);
 	if (p->k == NULL)
@@ -788,6 +790,9 @@ static int fill_kv_put(struct cr_idx_w *w,
 		p->v->ov_vec.v_count[i] = vlen;
 		p->v->ov_buf[i] = m0_alloc_aligned(vlen, PAGE_SHIFT);
 		cr_get_random_string(p->v->ov_buf[i], vlen);
+		for (j = 0; j < min_check(vlen, (int)ARRAY_SIZE(substring) - 1);
+		     ++j)
+			((char *)p->v->ov_buf[i])[j] = substring[j];
 		crlog(CLL_DEBUG, "Generated k=%s:" FID_F ",v=%s",
 		      kpart_one,
 		      FID_P(&k[i]),
