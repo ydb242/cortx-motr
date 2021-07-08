@@ -986,9 +986,9 @@ M0_BASSERT(M0_PI_TYPE_MAX <= 8);
 
 struct m0_pi_hdr {
 	/* type of protection algorithm being used */
-	uint8_t pi_type;
+	uint8_t pi_type : 8;
 	/*size of PI Structure in multiple of  32 bytes*/
-	uint8_t pi_size;
+	uint8_t pi_size : 8;
 };
 
 struct m0_md5_pi {
