@@ -471,7 +471,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 {
 	uint32_t                   seg;
 	uint32_t                   tseg;
-	uint32_t                   coff;
+	uint32_t                   coff = 0;
 	m0_bindex_t                toff;
 	m0_bindex_t                goff;
 	m0_bindex_t                pgstart;
@@ -493,7 +493,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	unsigned int               opcode;
 	m0_bcount_t                grp_size;
 	uint64_t                   page_size;
-	uint32_t                   ti_idx;
+	uint32_t                   ti_idx = 0;
 
 	M0_PRE(tgt != NULL);
 	frame = tgt->ta_frame;
@@ -520,10 +520,6 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	toff    = target_offset(frame, play, gob_offset);
 	pgstart = toff;
 	goff    = unit_type == M0_PUT_DATA ? gob_offset : 0;
-	coff    = di_cksum_offset(play, gob_offset);
-	ti_idx  = toff / layout_unit_size(play);
-	M0_LOG(M0_DEBUG, "YJC: coff = %"PRIu32 " toff = %"PRIu64 " goff = %"PRIu64,
-		          coff, toff, goff);
 
 	M0_LOG(M0_DEBUG,
 	       "[gpos %"PRIu64", count %"PRIu64"] [%"PRIu64", %"PRIu64"]"
@@ -625,6 +621,13 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 				 " with flags 0x%x: ", seg,
 				 INDEX(ivec, seg), COUNT(ivec, seg),
 				 FID_P(&ti->ti_fid), pattr[seg]);
+
+		if (unit_type == M0_PUT_DATA) {
+			coff    = di_cksum_offset(play, goff);
+			ti_idx  = toff / layout_unit_size(play);
+			M0_LOG(M0_DEBUG, "YJC: coff = %"PRIu32 " toff = %"PRIu64
+					 " goff = %"PRIu64, coff, toff, goff);
+		}
 
 		goff += COUNT(ivec, seg);
 		++ivec->iv_vec.v_nr;
