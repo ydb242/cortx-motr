@@ -613,6 +613,7 @@ static void obj_io_args_check(struct m0_obj      *obj,
 			      struct m0_bufvec   *attr,
 			      uint64_t            mask)
 {
+	M0_LOG(M0_ALWAYS, "vec cnt = %"PRIu64" bshift = %"PRIu64, m0_vec_count(&ext->iv_vec), obj->ob_attr.oa_bshift);
 	M0_ASSERT(M0_IN(opcode, (M0_OC_READ, M0_OC_WRITE,
 				 M0_OC_FREE)));
 	M0_ASSERT(ext != NULL);

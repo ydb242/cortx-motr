@@ -27,6 +27,7 @@
 #include "sm/sm.h"
 #include "layout/layout.h"            /* m0_layout_instance_to_enum */
 #include "ioservice/fid_convert.h"    /* M0_FID_GOB_CONTAINER_MASK */
+#include "lib/arith.h"
 
 #include "motr/addb.h"
 #include "motr/client.h"
@@ -405,7 +406,7 @@ void m0_obj_init(struct m0_obj *obj,
 		 uint64_t layout_id)
 {
 	size_t obj_size;
-
+	int    seg_bshift;
 	M0_ENTRY();
 
 	M0_PRE(obj != NULL);
@@ -414,12 +415,24 @@ void m0_obj_init(struct m0_obj *obj,
 	M0_PRE(entity_id_is_valid(id));
 	M0_PRE(M0_IS0(&obj->ob_entity));
 	M0_PRE(layout_id < m0_lid_to_unit_map_nr);
-
+	seg_bshift = m0_log2(
+		  parent->re_instance->m0c_ndom.nd_get_max_buffer_segment_size);
+	M0_LOG(M0_ALWAYS, "Segment size = %"PRIu64" Loc = %d ", parent->re_instance->m0c_ndom.nd_get_max_buffer_segment_size, 
+		seg_bshift);
 	/* Initalise the entity */
 	m0_entity_init(&obj->ob_entity, parent, id, M0_ET_OBJ);
 
 	/* set the blocksize to a reasonable default */
-	obj->ob_attr.oa_bshift = M0_DEFAULT_BUF_SHIFT;
+	if (layout_id != 0) {
+		M0_LOG(M0_ALWAYS, "1 Layout ID = %"PRIu64, layout_id);
+		obj->ob_attr.oa_bshift = min32(M0_DEFAULT_BUF_SHIFT +
+					       layout_id - 1, seg_bshift);
+	}
+	else {
+		M0_LOG(M0_ALWAYS, "2 Layout ID =  %"PRIu64, layout_id);
+		obj->ob_attr.oa_bshift = M0_DEFAULT_BUF_SHIFT;
+	}
+
 	obj_size = obj->ob_attr.oa_buf_size;
 	obj->ob_attr.oa_layout_id = obj_size == 0 && layout_id == 0 ?
 					M0_DEFAULT_LAYOUT_ID : layout_id;
