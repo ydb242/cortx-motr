@@ -1097,21 +1097,32 @@ bool m0_calc_verify_cksum_one_unit(struct m0_generic_pi *pi,
 #ifndef __KERNEL__
 				struct m0_md5_inc_context_pi md5_ctx_pi;
 				unsigned char *curr_context = m0_alloc(sizeof(MD5_CTX));
+				char *ptr = (char *)pi;
+				char *ptr1 = (char *)md5_ctx_pi.pi_value;
+				char *ptr2 = (char *)((struct m0_md5_inc_context_pi *)pi)->pi_value;
+				int i;
 				md5_ctx_pi.hdr.pi_type =
 					M0_PI_TYPE_MD5_INC_CONTEXT;
 				m0_calculate_md5_inc_context(&md5_ctx_pi,
 						seed, bvec, M0_PI_CALC_UNIT_ZERO,
 						curr_context, NULL);
 				m0_free(curr_context);
+				for (i=0;i<128;i++)
+					M0_LOG(M0_DEBUG, "YJC_CKSUM_CALC: %d", (int)ptr[i]);
+				for (i=0;i<MD5_DIGEST_LENGTH; i++) 
+					M0_LOG(M0_DEBUG, "YJC_CKSUM_CMP: %d : %d", (int)ptr1[i], (int)ptr2[i]);
 				if (memcmp(((struct m0_md5_inc_context_pi *)pi)->pi_value,
 							md5_ctx_pi.pi_value,
 							MD5_DIGEST_LENGTH) == 0)
 					return true;
+				else
+					M0_ASSERT(0);
 #endif
 			}
 
 	}
 
+	M0_LOG(M0_DEBUG, "YJC_CKSUM_CHECK: Retirning false");
 	return false;
 }
 
