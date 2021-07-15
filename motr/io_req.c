@@ -1148,7 +1148,7 @@ static bool verify_checksum(struct m0_op_io *ioo)
 	uint32_t nr_seg;
 	int attr_idx = 0;
 	m0_bcount_t bytes;
-
+	
 	usz = m0_obj_layout_id_to_unit_size(
 			m0__obj_lid(ioo->ioo_obj));
 
@@ -1215,7 +1215,9 @@ static bool verify_checksum(struct m0_op_io *ioo)
 
 			if (!m0_calc_verify_cksum_one_unit(pi_ondisk, &seed, &user_data)) {
 				M0_LOG(M0_DEBUG, "YJC_CKSUM_VERIFY: cksum mismatched");
-				return false;
+				//return false;
+			} else {
+				M0_LOG(M0_DEBUG, "YJC_CKSUM_MATCHED!!!!");
 			}
 		}
 
@@ -1233,6 +1235,7 @@ static bool verify_checksum(struct m0_op_io *ioo)
 	else {
 		M0_LOG(M0_DEBUG, "YJC_CKSUM_CHECK: returning from undefined condition");
 	/* something wrong, we terminated early */
+		M0_ASSERT(0);
 		return true;
 	}
 }
@@ -1309,19 +1312,27 @@ static int ioreq_application_data_copy(struct m0_op_io *ioo,
 
 	if (dir == CD_COPY_TO_APP) {
 		int i;
-		char *ptr = ioo->ioo_attr.ov_buf[0];
-		for (i=0; i<128; i++)
-			M0_LOG(M0_DEBUG, "YJC_CKSUM_READ %d ", (int)ptr[i]);
+		int j;
+		for (j=0; j<ioo->ioo_attr.ov_vec.v_nr; j++) {
+			char *ptr = ioo->ioo_attr.ov_buf[j];
+			for (i=64; i<128; i++)
+				ptr[i] = 'A';
+				//M0_LOG(M0_DEBUG, "YJC_CKSUM_READ %d %c ", j, (char )ptr[i]);
+		}
 		m0_client_bufvec_print(&ioo->ioo_attr, &ioo->ioo_data, "YJC_REP", 1);
 		/* verify the checksum for data read */
 		if (!verify_checksum(ioo)) {
-			return M0_RC(-EIO);
+			M0_LOG(M0_ERROR, "YJC_CKSUM_FAILED");
+			//return M0_RC(-EIO);
 		}
 	} else {
 		int i;
-		char *ptr = ioo->ioo_attr.ov_buf[0];
-		for (i=0; i<128; i++)
-			M0_LOG(M0_DEBUG, "YJC_CKSUM_WRITE %d ", (int)ptr[i]);
+		int j;
+		for (j=0; j<ioo->ioo_attr.ov_vec.v_nr; j++) {
+			char *ptr = ioo->ioo_attr.ov_buf[j];
+			for (i=0; i<128; i++)
+				M0_LOG(M0_DEBUG, "YJC_CKSUM_WRITE %d %c ", j, (char )ptr[i]);
+		}
 	}
 
 	return M0_RC(0);

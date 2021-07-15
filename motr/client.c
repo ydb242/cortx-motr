@@ -865,8 +865,6 @@ M0_INTERNAL int m0_calculate_md5_inc_context(
 
 	/* This call is for first data unit, need to initialize prev_context */
 	if (flag & M0_PI_CALC_UNIT_ZERO) {
-		memset(pi, 0, sizeof(struct m0_md5_inc_context_pi));
-		pi->hdr.pi_type = M0_PI_TYPE_MD5_INC_CONTEXT;
 		pi->hdr.pi_size = sizeof(struct m0_md5_inc_context_pi);
 		rc = MD5_Init((MD5_CTX *)&pi->prev_context);
 		if (rc != 1) {
@@ -1086,7 +1084,7 @@ int m0_client_calculate_pi(struct m0_generic_pi *pi,
 }
 
 M0_EXPORTED(m0_client_calculate_pi);
-
+#if 0
 bool m0_calc_verify_cksum_one_unit(struct m0_generic_pi *pi,
 				   struct m0_pi_seed *seed,
 				   struct m0_bufvec *bvec)
@@ -1124,6 +1122,57 @@ bool m0_calc_verify_cksum_one_unit(struct m0_generic_pi *pi,
 
 	M0_LOG(M0_DEBUG, "YJC_CKSUM_CHECK: Retirning false");
 	return false;
+}
+#endif
+
+bool m0_calc_verify_cksum_one_unit(struct m0_generic_pi *pi,
+                                   struct m0_pi_seed *seed,
+                                   struct m0_bufvec *bvec)
+{
+        switch(pi->hdr.pi_type) {
+                case M0_PI_TYPE_MD5_INC_CONTEXT:
+                        {
+#ifndef __KERNEL__
+                                struct m0_md5_inc_context_pi md5_ctx_pi;
+                                unsigned char *curr_context = m0_alloc(sizeof(MD5_CTX));
+				char *ptr = (char *)pi;
+				char *ptr1 = (char *)md5_ctx_pi.pi_value;
+				char *ptr2 = (char *)((struct m0_md5_inc_context_pi *)pi)->pi_value;
+				int i;
+				memset(&md5_ctx_pi, 0, sizeof(struct m0_md5_inc_context_pi));
+                                if (curr_context == NULL) {
+                                        return false;
+                                }
+				memcpy(md5_ctx_pi.prev_context,
+						((struct m0_md5_inc_context_pi *)pi)->prev_context,
+						sizeof(MD5_CTX));
+
+
+                                md5_ctx_pi.hdr.pi_type =
+                                        M0_PI_TYPE_MD5_INC_CONTEXT;
+				M0_LOG(M0_DEBUG, "YJC_CKSUM_SEED: data off = %"PRIu64, seed->data_unit_offset);
+                                m0_client_calculate_pi((struct m0_generic_pi *)&md5_ctx_pi,
+                                                seed, bvec, M0_PI_NO_FLAG,
+                                                curr_context, NULL);
+                                m0_free(curr_context);
+				for (i=0;i<128;i++)
+					M0_LOG(M0_DEBUG, "YJC_CKSUM_CALC: %d", (int)ptr[i]);
+				for (i=0;i<MD5_DIGEST_LENGTH; i++) 
+					M0_LOG(M0_DEBUG, "YJC_CKSUM_CMP: %d : %d", (int)ptr1[i], (int)ptr2[i]);
+                                if (memcmp(((struct m0_md5_inc_context_pi *)pi)->pi_value,
+                                                        md5_ctx_pi.pi_value,
+                                                        MD5_DIGEST_LENGTH) == 0)
+                                        return true;
+#endif
+                        }
+
+ 
+
+        }
+
+ 
+
+        return false;
 }
 
 M0_EXPORTED(m0_calc_verify_cksum_one_unit);
