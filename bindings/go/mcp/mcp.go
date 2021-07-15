@@ -16,6 +16,8 @@
  * For any questions about this software or licensing,
  * please email opensource@seagate.com or cortx-questions@seagate.com.
  *
+ * Original author: Andriy Tkachuk <andriy.tkachuk@seagate.com>
+ * Original creation date: 30-Oct-2020
  */
 
 package main
@@ -26,7 +28,7 @@ import (
     "fmt"
     "flag"
     "log"
-    "../mio"
+    "motr/mio"
 )
 
 func usage() {
@@ -40,16 +42,18 @@ func usage() {
     flag.PrintDefaults()
 }
 
+var objOff  int64
 var objSize uint64
 var bufSize int
-var pool    *string
+var pool   *string
 
 func init() {
     log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
     flag.Usage = usage
-    flag.IntVar(&bufSize, "bsz", 32, "I/O buffer `size` (in Mbytes)")
-    flag.Uint64Var(&objSize, "osz", 0, "object `size` (in Kbytes)")
+    flag.IntVar(&bufSize, "bsz", 32, "i/o buffer `size` (in MiB)")
+    flag.Int64Var(&objOff, "off", 0, "start object i/o at `offset` (in KiB)")
+    flag.Uint64Var(&objSize, "osz", 0, "object `size` (in KiB)")
     pool = flag.String("pool", "", "pool `fid` to create object at")
 }
 
@@ -59,6 +63,7 @@ func main() {
         usage()
         os.Exit(1)
     }
+    objOff  *= 1024
     objSize *= 1024
 
     src, dst := flag.Arg(0), flag.Arg(1)
@@ -71,6 +76,10 @@ func main() {
             log.Fatalf("failed to open object %v: %v", src, err)
         }
         defer mioR.Close()
+        if _, err := mioR.Seek(objOff, io.SeekStart); err != nil {
+            log.Fatalf("failed to set offset (%v) for object %v: %v",
+                       objOff, src, err)
+        }
         reader = &mioR
     } else if src == "-" {
         reader = os.Stdin
@@ -92,17 +101,30 @@ func main() {
 
     var writer io.Writer
     if _, err := mio.ScanID(dst); err == nil {
+        if *pool != "" {
+            if _, err := mio.ScanID(*pool); err != nil {
+                log.Fatalf("invalid pool specified: %v", *pool)
+            }
+        }
         if err = mioW.Open(dst); err != nil {
             if err = mioW.Create(dst, objSize, *pool); err != nil {
                 log.Fatalf("failed to create object %v: %v", dst, err)
             }
         }
         defer mioW.Close()
+        if *pool != "" && !mioW.InPool(*pool) {
+            log.Fatalf("the object already exists in another pool: %v",
+                       mioW.GetPool())
+        }
+        if _, err := mioW.Seek(objOff, io.SeekStart); err != nil {
+            log.Fatalf("failed to set offset (%v) for object %v: %v",
+                       objOff, src, err)
+        }
         writer = &mioW
     } else if dst == "-" {
         writer = os.Stdout
     } else {
-        file, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE, 0655)
+        file, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE, 0644)
         if err != nil {
             log.Fatalf("failed to open file %v: %v", dst, err)
         }
@@ -115,3 +137,5 @@ func main() {
     // might suffer. A tip from https://github.com/golang/go/issues/16474)
     io.CopyBuffer(struct{ io.Writer }{writer}, reader, buf)
 }
+
+// vi: sw=4 ts=4 expandtab ai

@@ -1,14 +1,18 @@
 Using HSM
 =========
 
-HSM stands for Hierarchical Storage Management. m0hsm tool allows to
+HSM stands for Hierarchical Storage Management. The concept and design are discussed
+in this paper: [Hierarchical Storage Management - SAGE 2016](https://github.com/Seagate/cortx/blob/main/doc/PDFs/2016_February_SAGE_WP3_HSM_for_SAGE_Concept_and_Architecture_v1_for_open_use_compressed.pdf).
+
+
+The m0hsm tool available in this directory allows to
 create composite objects in Motr, write/read to/from them and move them
 between the tiers (pools). Here is how to use the tool:
 
 1. Set the following environment variables:
 
    ```bash
-   export CLIENT_PROF_OPT="<0x7000000000000001:0x480>"   # profile id
+   export CLIENT_PROFILE="<0x7000000000000001:0x480>"    # profile id
    export CLIENT_HA_ADDR="172.18.1.24@o2ib:12345:34:101" # ha-agent address
    export CLIENT_LADDR="172.18.1.24@o2ib:12345:41:322"   # local address
    export CLIENT_PROC_FID="<0x7200000000000001:0xdf>"    # process id
@@ -22,7 +26,7 @@ between the tiers (pools). Here is how to use the tool:
 2. Initialize the composite layout index:
 
    ```Text
-   $ m0composite "$CLIENT_LADDR" "$CLIENT_HA_ADDR" "$CLIENT_PROF_OPT" "$CLIENT_PROC_FID"
+   $ m0composite "$CLIENT_LADDR" "$CLIENT_HA_ADDR" "$CLIENT_PROFILE" "$CLIENT_PROC_FID"
    ```
 
    Note: this should be done one time only after the cluster bootstrap.
