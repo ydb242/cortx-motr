@@ -480,7 +480,6 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	uint32_t                   tseg;
 	m0_bindex_t                toff;
 	m0_bindex_t                goff;
-	m0_bindex_t                goff_end;
 	m0_bindex_t                pgstart;
 	m0_bindex_t                pgend;
 	m0_bindex_t                unit_sz;                  
@@ -501,6 +500,8 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 	m0_bcount_t                grp_size;
 	m0_bcount_t                cs_sz;
 	uint64_t                   page_size;
+	struct m0_ext              goff_span_ext;
+	bool                       is_goff_in_range;
 	void 					  *dst_attr = NULL;	
 	uint32_t 				   b_nob;
 
@@ -636,9 +637,12 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 				 INDEX(ivec, seg), COUNT(ivec, seg),
 				 FID_P(&ti->ti_fid), pattr[seg]);
 		/** Ignore hole because of data size not alligned pool width */
-		goff_end = ioo->ioo_ext.iv_index[ioo->ioo_ext.iv_vec.v_nr - 1] + ioo->ioo_ext.iv_vec.v_count[ioo->ioo_ext.iv_vec.v_nr - 1]; 
-		if(dst_attr != NULL && unit_type == M0_PUT_DATA && opcode == M0_OC_WRITE && goff < goff_end) {
+		goff_span_ext.e_start = ioo->ioo_ext.iv_index[0];
+		goff_span_ext.e_end = ioo->ioo_ext.iv_index[ioo->ioo_ext.iv_vec.v_nr - 1] + ioo->ioo_ext.iv_vec.v_count[ioo->ioo_ext.iv_vec.v_nr - 1]; 
+		is_goff_in_range = m0_ext_is_in(&goff_span_ext, goff);
+		if(dst_attr != NULL && unit_type == M0_PUT_DATA && opcode == M0_OC_WRITE && is_goff_in_range) {
 			void *src_attr;	
+			char *ptr;
 			
 			/* This we can do as page_size <= unit_sz */
 			b_nob = m0_extent_get_checksum_nob( goff, COUNT(ivec, seg), unit_sz, cs_sz );
@@ -652,6 +656,9 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 				 */
 				src_attr = m0_extent_vec_get_checksum_addr( &ioo->ioo_attr, goff, 
 												&ioo->ioo_ext, unit_sz, cs_sz);
+				ptr = (char *)m0_extent_vec_get_checksum_addr( &ioo->ioo_data, goff, 
+												&ioo->ioo_ext, unit_sz, unit_sz);
+				M0_LOG(M0_DEBUG,"YJC_CHECK goff = %"PRIu64 "data = %c%c", goff/unit_sz, ptr[0], ptr[1]);
 				M0_ASSERT(b_nob == cs_sz);
 				memcpy(dst_attr + ti->ti_cksum_copied, src_attr, b_nob);
 				
@@ -666,7 +673,7 @@ static void target_ioreq_seg_add(struct target_ioreq              *ti,
 			}
 			
 		} else if (goff_ivec != NULL && unit_type == M0_PUT_DATA &&
-				opcode == M0_OC_READ && goff < goff_end) {
+				opcode == M0_OC_READ && is_goff_in_range) {
 			/**
 			 * Storing the values of goff(checksum offset) into the
 			 * goff_ivec according to target offset. This creates a
@@ -801,6 +808,33 @@ static void irfop_fini(struct ioreq_fop *irfop)
 	m0_free(irfop);
 
 	M0_LEAVE();
+}
+
+static void print_ivec(struct m0_indexvec *ivec, struct m0_indexvec *ti_ivec)
+{
+	uint64_t                     count;
+	uint32_t                     unit;
+	uint32_t                     unit_size;
+	struct m0_ivec_cursor        cursor_tivec;
+	struct m0_ivec_cursor        cursor;
+
+	count     = 0;
+	unit_size = 4096;
+	m0_ivec_cursor_init(&cursor, ivec);
+	if (ti_ivec != NULL)
+		m0_ivec_cursor_init(&cursor_tivec, ti_ivec);
+
+	while (!m0_ivec_cursor_move(&cursor, count)) {
+		unit = m0_ivec_cursor_index(&cursor) / unit_size;
+		//count = m0_ivec_cursor_step(&cursor);
+		count = unit_size;
+		if (ti_ivec != NULL) {
+			M0_LOG(M0_DEBUG, "YJC_IVEC: index = %"PRIu64 " tioff = %"PRIu64" unit = %u count = %"PRIu64, m0_ivec_cursor_index(&cursor), m0_ivec_cursor_index(&cursor_tivec), unit, count);
+			m0_ivec_cursor_move(&cursor_tivec, 128);
+		} else {
+			M0_LOG(M0_DEBUG, "YJC_IVEC: index = %"PRIu64 " unit = %u count = %"PRIu64, m0_ivec_cursor_index(&cursor), unit, count);
+		}
+	}
 }
 
 
@@ -1002,14 +1036,17 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 			if(m0_is_write_fop(&iofop->if_fop))	{
 				rw_fop->crw_di_data_cksum.b_addr = ti->ti_attrbuf.b_addr;
 				rw_fop->crw_di_data_cksum.b_nob = ti->ti_cksum_copied;
+				rw_fop->crw_is_data_fop = 1;
 			}
 			else {
 				rw_fop->crw_di_data_cksum.b_addr = NULL;
 				rw_fop->crw_di_data_cksum.b_nob = 0;
+				rw_fop->crw_is_data_fop = 2;
 			}		
-            rw_fop->crw_cksum_size = ioo->ioo_attr.ov_vec.v_count[0];
+			rw_fop->crw_cksum_size = ioo->ioo_attr.ov_vec.v_count[0];
 		}
 		else {
+			rw_fop->crw_is_data_fop = 0;
 			rw_fop->crw_di_data_cksum.b_addr = NULL;
 			rw_fop->crw_di_data_cksum.b_nob  = 0;
 			rw_fop->crw_cksum_size = 0;
@@ -1040,6 +1077,13 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 			m0_atomic64_add(&xfer->nxr_rdbulk_nr,
 					m0_rpc_bulk_buf_length(
 					&iofop->if_rbulk));
+		if (m0_is_write_fop(&iofop->if_fop)) {
+			struct m0_indexvec debug_ivec;
+			m0_indexvec_wire2mem(&rw_fop->crw_ivec,
+					rw_fop->crw_ivec.ci_nr, 0,
+					&debug_ivec);
+			print_ivec(&debug_ivec, NULL);
+		}
 
 		m0_atomic64_inc(&ti->ti_nwxfer->nxr_iofop_nr);
 		iofops_tlist_add(&ti->ti_iofops, irfop);
