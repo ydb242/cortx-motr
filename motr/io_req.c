@@ -1316,8 +1316,7 @@ static int ioreq_application_data_copy(struct m0_op_io *ioo,
 		for (j=0; j<ioo->ioo_attr.ov_vec.v_nr; j++) {
 			char *ptr = ioo->ioo_attr.ov_buf[j];
 			for (i=64; i<128; i++)
-				ptr[i] = 'A';
-				//M0_LOG(M0_DEBUG, "YJC_CKSUM_READ %d %c ", j, (char )ptr[i]);
+				M0_LOG(M0_DEBUG, "YJC_CKSUM_READ %d %c ", j, (char )ptr[i]);
 		}
 		m0_client_bufvec_print(&ioo->ioo_attr, &ioo->ioo_data, "YJC_REP", 1);
 		/* verify the checksum for data read */
