@@ -1138,6 +1138,7 @@ bool m0_calc_verify_cksum_one_unit(struct m0_generic_pi *pi,
 				char *ptr = (char *)pi;
 				char *ptr1 = (char *)md5_ctx_pi.pi_value;
 				char *ptr2 = (char *)((struct m0_md5_inc_context_pi *)pi)->pi_value;
+				char seed_str[64] = {'\0'};
 				int i;
 				memset(&md5_ctx_pi, 0, sizeof(struct m0_md5_inc_context_pi));
                                 if (curr_context == NULL) {
@@ -1151,6 +1152,16 @@ bool m0_calc_verify_cksum_one_unit(struct m0_generic_pi *pi,
                                 md5_ctx_pi.hdr.pi_type =
                                         M0_PI_TYPE_MD5_INC_CONTEXT;
 				M0_LOG(M0_DEBUG, "YJC_CKSUM_SEED: data off = %"PRIu64, seed->data_unit_offset);
+				snprintf(seed_str, sizeof(seed_str), "%"PRIx64"%"PRIx64"%"PRIx64,
+						seed->obj_id.f_container, seed->obj_id.f_key,
+						seed->data_unit_offset);
+				M0_LOG(M0_DEBUG, 
+						"YJC_CKSUM_SEED: f_container %"PRIx64"f_key %"PRIx64
+						"data_unit_offset %"PRIx64"seed_str %s",
+						seed->obj_id.f_container,
+						seed->obj_id.f_key,
+						seed->data_unit_offset,
+						(char *)seed_str);
                                 m0_client_calculate_pi((struct m0_generic_pi *)&md5_ctx_pi,
                                                 seed, bvec, M0_PI_NO_FLAG,
                                                 curr_context, NULL);

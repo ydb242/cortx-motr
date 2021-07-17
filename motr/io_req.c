@@ -1207,7 +1207,7 @@ static bool verify_checksum(struct m0_op_io *ioo)
 
 		if (ioo->ioo_attr.ov_vec.v_count[attr_idx] != 0) {
 
-			seed.data_unit_offset   = m0_ivec_cursor_index(&extcur)/usz;
+			seed.data_unit_offset   = m0_ivec_cursor_index(&extcur);
 			seed.obj_id.f_container = ioo->ioo_obj->ob_entity.en_id.u_hi;
 			seed.obj_id.f_key       = ioo->ioo_obj->ob_entity.en_id.u_lo;
 
@@ -1215,7 +1215,7 @@ static bool verify_checksum(struct m0_op_io *ioo)
 
 			if (!m0_calc_verify_cksum_one_unit(pi_ondisk, &seed, &user_data)) {
 				M0_LOG(M0_DEBUG, "YJC_CKSUM_VERIFY: cksum mismatched");
-				//return false;
+				return false;
 			} else {
 				M0_LOG(M0_DEBUG, "YJC_CKSUM_MATCHED!!!!");
 			}
@@ -1322,7 +1322,7 @@ static int ioreq_application_data_copy(struct m0_op_io *ioo,
 		/* verify the checksum for data read */
 		if (!verify_checksum(ioo)) {
 			M0_LOG(M0_ERROR, "YJC_CKSUM_FAILED");
-			//return M0_RC(-EIO);
+			return M0_RC(-EIO);
 		}
 	} else {
 		int i;
