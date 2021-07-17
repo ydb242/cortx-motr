@@ -1095,7 +1095,6 @@ static int application_data_copy(struct pargrp_iomap      *map,
 			M0_LOG(M0_DEBUG, "%"PRIu64
 					 " bytes copied from application "
 					 "from offset %"PRIu64, bytes, start);
-			ioo->ioo_pbuf_type = M0_PBUF_DIR;
 			map->pi_ioo->ioo_copied_nr += bytes;
 
 			/*
@@ -1472,9 +1471,10 @@ static int ioreq_dgmode_read(struct m0_op_io *ioo, bool rmw)
 
 	if (rc != 0)
 		return M0_ERR_INFO(rc, "[%p] dgmode failed", ioo);
-
+	
 	M0_LOG(M0_DEBUG, "[%p] dgmap_nr=%u is in dgmode",
 			 ioo, ioo->ioo_dgmap_nr);
+	ioo->ioo_pbuf_type = M0_PBUF_DIR;
 	/*
 	 * Starts processing the pages again if any of the parity groups
 	 * spanned by input IO-request is in degraded mode.
