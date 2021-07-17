@@ -1095,6 +1095,7 @@ static int application_data_copy(struct pargrp_iomap      *map,
 			M0_LOG(M0_DEBUG, "%"PRIu64
 					 " bytes copied from application "
 					 "from offset %"PRIu64, bytes, start);
+			ioo->ioo_pbuf_type = M0_PBUF_DIR;
 			map->pi_ioo->ioo_copied_nr += bytes;
 
 			/*

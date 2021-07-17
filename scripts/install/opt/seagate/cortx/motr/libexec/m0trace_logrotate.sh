@@ -59,11 +59,14 @@ log_files_max_count=5
 # have hard coded the log path, 
 # Need to get it from config file 
 motr_logdirs=`ls -d /var/motr*`
+s3_logdir=`ls -d /var/log/seagate/motr`
+logdirs="$motr_logdir $s3_logdir"
+
 M0TR_M0D_TRACE_DIR=$(cat /etc/sysconfig/motr  | grep "^MOTR_M0D_TRACE_DIR" | cut -d '=' -f2)
 M0D_TRACE_DIR="${M0TR_M0D_TRACE_DIR%\'}"
 M0D_TRACE_DIR="${M0D_TRACE_DIR#\'}"
 if [ -n "$M0D_TRACE_DIR" ]; then
-    motr_logdirs="$motr_logdirs $M0D_TRACE_DIR"
+    logdirs="$logdirs $M0D_TRACE_DIR"
 fi
 
 while getopts ":n:" option; do
@@ -87,14 +90,14 @@ else
 fi
 
 echo "Max log file count: $log_files_max_count"
-echo "Log file directory: $motr_logdirs"
+echo "Log file directory: $logdirs"
 
 # check for log directory entries
-for motr_logdir in $motr_logdirs ; do
+for motr_logdir in $logdirs ; do
     [[ $(check_param $motr_logdir) = "continue" ]] && continue || echo "$motr_logdir"
 
     # get the log directory of each m0d instance
-    log_dirs=`find $motr_logdir -maxdepth 1 -type d -name m0d-\*`
+    log_dirs=`find $motr_logdir -maxdepth 1 -type d -name "m0d-\*" -o -name "hax" -o -name "s3s*"`
 
     [[ $(check_param $log_dirs) = "continue" ]] && continue || echo "$log_dirs"
 
