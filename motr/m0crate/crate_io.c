@@ -691,12 +691,12 @@ int cr_task_execute(struct m0_task_io *cti)
 			}
 			break;
 		case CR_READ:
-			cr_op_namei(cwi, cti, CR_CREATE);
+//			cr_op_namei(cwi, cti, CR_CREATE);
 			rc = cr_op_namei(cwi, cti, CR_OPEN);
 			if (rc == 0) {
-				cr_op_io(cwi, cti, CR_WRITE);
+//				cr_op_io(cwi, cti, CR_WRITE);
 				cr_op_io(cwi, cti, CR_READ);
-				cr_op_namei(cwi, cti, CR_DELETE);
+//				cr_op_namei(cwi, cti, CR_DELETE);
 			}
 			break;
 		case CR_DELETE:
@@ -879,7 +879,7 @@ int cr_task_prep_one(struct m0_workload_io *cwi,
 
 	if (cwi->cwi_share_object) {
 		cti->cti_ids[0] = cwi->cwi_g.cg_oid;
-	} else if (M0_IN(cwi->cwi_opcode, (CR_POPULATE, CR_CLEANUP))) {
+	} else if (M0_IN(cwi->cwi_opcode, (CR_POPULATE, CR_READ, CR_CLEANUP))) {
 		int i;
 		for (i = 0; i< cwi->cwi_nr_objs; i++) {
 			cwi->cwi_start_obj_id.u_lo++;
