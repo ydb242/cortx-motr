@@ -569,7 +569,11 @@ M0_INTERNAL int m0_poolmach_state_transit(struct m0_poolmach       *pm,
 			return M0_ERR(-EINVAL);
 		break;
 	case M0_PNDS_FAILED:
-		if (event->pe_state != M0_PNDS_SNS_REPAIRING)
+		/* TODO:
+		 * This need to be revisit when SNS repair will be available
+		 */
+		if (!M0_IN(event->pe_state, (M0_PNDS_ONLINE,
+		                             M0_PNDS_SNS_REPAIRING)))
 			return M0_ERR(-EINVAL);
 		break;
 	case M0_PNDS_SNS_REPAIRING:
