@@ -483,7 +483,7 @@ M0_INTERNAL void * m0_extent_vec_get_checksum_addr(void *cksum_buf_vec, m0_binde
 
 	if( attr_nob )
 	{
-		M0_ASSERT(m0_vec_cursor_end(&cksum_cursor) >= attr_nob);
+		M0_ASSERT(m0_vec_cursor_end(&cksum_cursor.bc_vc) >= attr_nob);
 		m0_bufvec_cursor_move(&cksum_cursor, attr_nob);	
 	}
 	cksum_addr = m0_bufvec_cursor_addr(&cksum_cursor);
