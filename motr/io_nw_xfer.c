@@ -1002,9 +1002,7 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 		/* In case of partially spanned units in a parity group,
 		 * degraded read expects zero-filled units from server side.
 		 */
-		if (ioreq_sm_state(ioo) != IRS_DEGRADED_READING &&
-		    ioo->ioo_flags & M0_OOF_NOHOLE)
-		/* Assign the checksum buffer for traget */
+		/* Assign the checksum buffer for target */
 		if(filter == PA_DATA) {
 			if(m0_is_write_fop(&iofop->if_fop))	{
 				rw_fop->crw_di_data_cksum.b_addr = ti->ti_attrbuf.b_addr;
@@ -1025,7 +1023,8 @@ static int target_ioreq_iofops_prepare(struct target_ioreq *ti,
 			rw_fop->crw_cksum_size = 0;
 		}
 
-		if (ioo->ioo_flags & M0_OOF_NOHOLE)
+		if (ioreq_sm_state(ioo) != IRS_DEGRADED_READING &&
+		    ioo->ioo_flags & M0_OOF_NOHOLE)
 			rw_fop->crw_flags |= M0_IO_FLAG_NOHOLE;
 
 		if (ioo->ioo_flags & M0_OOF_SYNC)
@@ -1470,13 +1469,6 @@ static int nw_xfer_io_distribute(struct nw_xfer_request *xfer)
 			if (rc != 0)
 				goto err;
 
-<<<<<<< HEAD
-=======
-			if (op_code == M0_OC_WRITE && do_cobs)
-				m0_bitmap_set(&units_spanned, unit, true);
-
-	
->>>>>>> F23B_Datacorruption: Detect data corruption by validating checksum
 			ti->ti_ops->tio_seg_add(ti, &src, &tgt, r_ext.e_start,
 						m0_ext_length(&r_ext), iomap);
 			if (op_code == M0_OC_WRITE && do_cobs &&
