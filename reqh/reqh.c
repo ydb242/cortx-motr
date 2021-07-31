@@ -454,17 +454,19 @@ M0_INTERNAL int m0_reqh_fop_allow(struct m0_reqh *reqh, struct m0_fop *fop)
 		return M0_ERR(-ECONNREFUSED);
 
 	rh_st = m0_reqh_state_get(reqh);
+	svc_st = m0_reqh_service_state_get(svc);
 	if (rh_st == M0_REQH_ST_INIT) {
 		/*
 		 * Allow rpc connection fops from other services during
 		 * startup.
 		 */
-		if (svc != NULL && M0_IN(stype, (&m0_rpc_service_type,
+		if (svc_st == M0_RST_STARTED && M0_IN(stype, (&m0_rpc_service_type,
 #ifndef __KERNEL__
 						 &m0_cas_service_type,
 #endif
 		                                 &m0_ha_link_service_type,
-		                                 &m0_ha_entrypoint_service_type)))
+		                                 &m0_ha_entrypoint_service_type)) &&
+						 m0_reqh_service_state_get(svc) == M0_RST_STARTED)
 			return M0_RC(0);
 		return M0_ERR(-EAGAIN);
 	}
@@ -472,7 +474,6 @@ M0_INTERNAL int m0_reqh_fop_allow(struct m0_reqh *reqh, struct m0_fop *fop)
 		return M0_ERR(-ESHUTDOWN);
 
 	M0_ASSERT(svc->rs_ops != NULL);
-	svc_st = m0_reqh_service_state_get(svc);
 
 	switch (rh_st) {
 	case M0_REQH_ST_NORMAL:
