@@ -1139,7 +1139,6 @@ static int application_data_copy(struct pargrp_iomap      *map,
  */
 static bool verify_checksum(struct m0_op_io *ioo)
 {
-
 	struct m0_pi_seed seed;
 	struct m0_bufvec user_data = {};
 	int usz, rc, count, i;
@@ -1214,6 +1213,7 @@ static bool verify_checksum(struct m0_op_io *ioo)
 			seed.obj_id.f_key       = ioo->ioo_obj->ob_entity.en_id.u_lo;
 
 			pi_ondisk = (struct m0_generic_pi *)ioo->ioo_attr.ov_buf[attr_idx];
+
 			if (!m0_calc_verify_cksum_one_unit(pi_ondisk, &seed, &user_data)) {
 				return false;
 			}
@@ -1235,7 +1235,6 @@ static bool verify_checksum(struct m0_op_io *ioo)
 		M0_ASSERT(0);
 		return true;
 	}
-	return true;
 }
 
 /**
@@ -1310,7 +1309,7 @@ static int ioreq_application_data_copy(struct m0_op_io *ioo,
 
 	if (dir == CD_COPY_TO_APP) {
 		/* verify the checksum for data read */
-		if (!verify_checksum(ioo)) {
+		if ( ioo->ioo_attr.ov_vec.v_nr && !verify_checksum(ioo)) {
 			M0_LOG(M0_ERROR, "CKSUM_FAILED");
 			return M0_RC(-EIO);
 		}
