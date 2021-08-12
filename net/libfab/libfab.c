@@ -30,6 +30,7 @@
 
 #ifdef ENABLE_LIBFAB
 
+#include <stdio.h>
 #include <netinet/in.h>         /* INET_ADDRSTRLEN */
 #include <arpa/inet.h>          /* inet_pton, htons */
 #include <sched.h>              /* sched_yield */
@@ -764,12 +765,10 @@ static void libfab_txep_comp_read(struct fid_cq *cq, struct m0_fab__tm *tm)
  */
 static void libfab_poller(struct m0_fab__tm *tm)
 {
-	struct m0_fab__ev_ctx    *ctx;
+	struct m0_net_end_point  *net;	
 	struct m0_fab__ep        *xep;
 	struct m0_fab__active_ep *aep;
 	struct fid_cq            *cq;
-	struct epoll_event        ev;
-	int                       ev_cnt;
 	int                       ret;
 
 	/* Wait for the transfer machine to get started */
@@ -778,7 +777,6 @@ static void libfab_poller(struct m0_fab__tm *tm)
 	
 	while (tm->ftm_state != FAB_TM_SHUTDOWN) {
 		sched_yield();
-		ev_cnt = epoll_wait(tm->ftm_epfd, &ev, 1, FAB_WAIT_FD_TMOUT);
 
 		while (1) {
 			m0_mutex_lock(&tm->ftm_endlock);
@@ -798,32 +796,30 @@ static void libfab_poller(struct m0_fab__tm *tm)
 		
 		M0_ASSERT(libfab_tm_is_locked(tm) && libfab_tm_invariant(tm));
 
-		if (ev_cnt > 0) {
-			ctx = ev.data.ptr;
-			if (ctx->evctx_type == FAB_COMMON_Q_EVENT) {
-				/* Check the common queue of the
-				   transfer machine for events */
-				libfab_handle_connect_request_events(tm);
-				libfab_txep_comp_read(tm->ftm_tx_cq, tm);
-			} else {
-				/* Check the private queue of the
-				   endpoint for events */
-				xep = ctx->evctx_ep;
-				aep = libfab_aep_get(xep);
-				libfab_txep_event_check(xep, aep, tm);
-				cq = aep->aep_rx_res.frr_cq;
-				libfab_rxep_comp_read(cq, xep, tm);
-			}
-		}
+		/* Check the common queue of the
+			transfer machine for events */
+		libfab_handle_connect_request_events(tm);
+		libfab_txep_comp_read(tm->ftm_tx_cq, tm);
+
+		/* Check the private queue of the
+			endpoint for events */
+		net = m0_nep_tlist_pop(&tm->ftm_ntm->ntm_end_points);
+		m0_nep_tlist_add_tail(&tm->ftm_ntm->ntm_end_points, net);
+		xep = libfab_ep(net);
+		aep = libfab_aep_get(xep);		
+		libfab_txep_event_check(xep, aep, tm);
+		cq = aep->aep_rx_res.frr_cq;
+		libfab_rxep_comp_read(cq, xep, tm);
 
 		libfab_bulk_buf_process(tm);
 		if (m0_time_sub(m0_time_now(), tm->ftm_tmout_check) >=
-								 m0_time(1,0))
+								m0_time(1,0))
 			libfab_tm_buf_timeout(tm);
 		libfab_tm_buf_done(tm);
 
 		M0_ASSERT(libfab_tm_invariant(tm));
 		libfab_tm_unlock(tm);
+
 	}
 }
 
@@ -2374,7 +2370,7 @@ static int libfab_waitfd_bind(struct fid* fid, struct m0_fab__tm *tm, void *ctx)
 	if (rc != FI_SUCCESS)
 		return M0_ERR(rc);
 
-	ev.events = EPOLLIN;
+	ev.events = EPOLLIN | EPOLLET;
 	ev.data.ptr = ctx;
 	rc = epoll_ctl(tm->ftm_epfd, EPOLL_CTL_ADD, fd, &ev);
 
