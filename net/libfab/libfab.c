@@ -616,7 +616,7 @@ static uint32_t libfab_handle_connect_request_events(struct m0_fab__tm *tm)
 	struct fi_eq_cm_entry    *cm_entry;
 	char                      entry[(sizeof(struct fi_eq_cm_entry) + 
 					sizeof(struct m0_fab__conn_data))];
-	uint32_t                  event;
+	uint32_t                  event = -1;
 	int                       rc;
 	char                      straddr[LIBFAB_ADDR_STRLEN_MAX] = { '\0' };
 
@@ -716,7 +716,6 @@ static void libfab_rxep_comp_read(struct fid_cq *cq, struct m0_fab__ep *ep,
 	int                  cnt;
 	uint32_t             rem_token;
 
-	memset(&len, 0, sizeof(len));
 	if (cq != NULL) {
 		cnt = libfab_check_for_comp(cq, token, len, data);
 		for (i = 0; i < cnt; i++) {
