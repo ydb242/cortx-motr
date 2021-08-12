@@ -52,7 +52,7 @@ static uint64_t  mr_key_idx = 0;
 static uint32_t  buf_token = 0;
 static uint32_t  rr_queue[M0_NET_QT_NR+1];
 
-#define LIBFAB_AL_NUM_HASH_Q_PER_QUEUE (256)
+#define LIBFAB_AL_NUM_HASH_Q_PER_QUEUE (128)
 
 union m0_libfab_token
 {
@@ -63,9 +63,9 @@ union m0_libfab_token
 		/* m0_log2(roundup_power2(M0_NET_QT_NR+1)) */
 		uint32_t queue_id  : 3;
 		/* m0_log2(LIBFAB_AL_NUM_HASH_Q_PER_QUEUE) */
-		uint32_t queue_num : 8;
+		uint32_t queue_num : 7;
 		/* 32 - m0_log2(LIBFAB_AL_NUM_HASH_Q_PER_QUEUE) - m0_log2(roundup_power2(M0_NET_QT_NR+1)) */
-		uint32_t tag       : 21;
+		uint32_t tag       : 22;
  	} Fields;	
 };
 
