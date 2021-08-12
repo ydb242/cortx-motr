@@ -747,7 +747,7 @@ static void libfab_txep_comp_read(struct fid_cq *cq, struct m0_fab__tm *tm)
 {
 	struct m0_fab__active_ep *aep;
 	struct m0_fab__buf       *fb = NULL;
-	uint32_t                  token[FAB_MAX_COMP_READ] = {0};
+	uint32_t                  token[FAB_MAX_COMP_READ];
 	int                       i;
 	int                       cnt;
 
