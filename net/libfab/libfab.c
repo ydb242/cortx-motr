@@ -50,6 +50,25 @@ static char     *protf[]  = { "unix", "inet", "inet6" };
 static char     *socktype[] = { "stream", "dgram" };
 static uint64_t  mr_key_idx = 0;
 static uint32_t  buf_token = 0;
+static uint32_t  rr_queue[M0_NET_QT_NR+1];
+
+#define LIBFAB_AL_NUM_HASH_Q_PER_QUEUE (256)
+
+union m0_libfab_token
+{
+	uint32_t val;
+
+	struct
+	{
+		/* m0_log2(roundup_power2(M0_NET_QT_NR+1)) */
+		uint32_t queue_id  : 3;
+		/* m0_log2(LIBFAB_AL_NUM_HASH_Q_PER_QUEUE) */
+		uint32_t queue_num : 8;
+		/* 32 - m0_log2(LIBFAB_AL_NUM_HASH_Q_PER_QUEUE) - m0_log2(roundup_power2(M0_NET_QT_NR+1)) */
+		uint32_t tag       : 21;
+ 	} Fields;	
+};
+
 /** 
  * Bitmap of used transfer machine identifiers. 1 is for used,
  * and 0 is for free.
@@ -78,14 +97,20 @@ M0_TL_DEFINE(fab_bulk, static, struct m0_fab__bulk_op);
 
 static uint32_t libfab_bht_func(const struct m0_htable *ht, const void *key)
 {
+	union m0_libfab_token *token = (union m0_libfab_token *)key;
+	
 	/* Max number of buckets = 7
 	   The last 3 bits in the token is the bucket id */
-	return (*(uint32_t *)key & 0x7);
+	return ( (token->Fields.queue_id * LIBFAB_AL_NUM_HASH_Q_PER_QUEUE) + 
+	          token->Fields.queue_num );
 }
 
 static bool libfab_bht_key_eq(const void *key1, const void *key2)
 {
-	return ((*(const uint32_t *)key1) == (*(const uint32_t *)key2));
+	union m0_libfab_token *token1 = (union m0_libfab_token *)key1;
+	union m0_libfab_token *token2 = (union m0_libfab_token *)key2;
+
+	return ( token1->val == token2->val );
 }
 
 M0_HT_DESCR_DEFINE(fab_bufhash, "Hash of bufs", static, struct m0_fab__buf,
@@ -740,14 +765,17 @@ static void libfab_txep_comp_read(struct fid_cq *cq, struct m0_fab__tm *tm)
 			if ((fb->fb_token & M0_NET_QT_NR) == M0_NET_QT_NR) {
 				fab_bufhash_htable_del(
 						 &tm->ftm_bufhash.bht_hash, fb);
+				M0_ASSERT(aep->aep_bulk_cnt);
 				--aep->aep_bulk_cnt;
 				m0_free(fb);
 			} else {
 				if (M0_IN(fb->fb_nb->nb_qtype,
 					(M0_NET_QT_MSG_SEND,
 					 M0_NET_QT_ACTIVE_BULK_RECV,
-					 M0_NET_QT_ACTIVE_BULK_SEND)))
+					 M0_NET_QT_ACTIVE_BULK_SEND))) {
+					M0_ASSERT(aep->aep_bulk_cnt >= fb->fb_wr_cnt);					 
 					aep->aep_bulk_cnt -= fb->fb_wr_cnt;
+				}
 
 				fb->fb_wr_comp_cnt = fb->fb_wr_cnt + 1;
 				if (fb->fb_wr_comp_cnt >= fb->fb_wr_cnt) {
@@ -2370,7 +2398,7 @@ static int libfab_waitfd_bind(struct fid* fid, struct m0_fab__tm *tm, void *ctx)
 	if (rc != FI_SUCCESS)
 		return M0_ERR(rc);
 
-	ev.events = EPOLLIN | EPOLLET;
+	ev.events = EPOLLIN;
 	ev.data.ptr = ctx;
 	rc = epoll_ctl(tm->ftm_epfd, EPOLL_CTL_ADD, fd, &ev);
 
@@ -2595,12 +2623,19 @@ static int libfab_bulk_op(struct m0_fab__active_ep *aep, struct m0_fab__buf *fb)
  */
 static uint32_t libfab_buf_token_get(struct m0_fab__buf *fb)
 {
-	uint32_t ret = (fb->fb_nb == NULL) ? M0_NET_QT_NR : fb->fb_nb->nb_qtype;
+	union m0_libfab_token token;
+
+	token.val = 0;
+	token.Fields.queue_id = (fb->fb_nb == NULL) ? M0_NET_QT_NR : 
+												  fb->fb_nb->nb_qtype;
 	++buf_token;
-	if (buf_token >= (1 << 24))
-		buf_token = 1;
-	ret |= (buf_token << 8);
-	return ret;
+	// Queue selection round robin for a queue type
+	++rr_queue[token.Fields.queue_id];
+
+	token.Fields.queue_num = rr_queue[token.Fields.queue_id];
+	token.Fields.tag = buf_token;
+	
+	return token.val;
 }
 
 static int libfab_domain_params_get(struct m0_fab__ndom *fab_ndom)
@@ -2758,7 +2793,7 @@ static int libfab_ma_init(struct m0_net_transfer_mc *ntm)
 		fab_bulk_tlist_init(&ftm->ftm_bulk);
 		ftm->ftm_bufhash.bht_magic = M0_NET_LIBFAB_BUF_HT_HEAD_MAGIC;
 		rc = fab_bufhash_htable_init(&ftm->ftm_bufhash.bht_hash,
-					     (M0_NET_QT_NR + 1));
+					     (M0_NET_QT_NR + 1) * LIBFAB_AL_NUM_HASH_Q_PER_QUEUE);
 	} else
 		rc = M0_ERR(-ENOMEM);
 
