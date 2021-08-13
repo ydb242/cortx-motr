@@ -1399,7 +1399,7 @@ static int nw_xfer_io_distribute(struct nw_xfer_request *xfer)
 
 			if (!do_cobs)
 				continue; /* to next iomap */
-
+			/* test **/
 			/*
 			 * Create cobs for all units not spanned by the
 			 * IO request (data or spare units).

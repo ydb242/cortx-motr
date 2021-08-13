@@ -362,6 +362,7 @@ int m0_write(struct m0_container *container, char *src,
 	struct m0_rm_lock_req         req;
 	const struct m0_obj_lock_ops *lock_ops;
 
+	M0_ENTRY("Test code");
 	/* Open source file */
 	fp = fopen(src, "r");
 	if (fp == NULL)
