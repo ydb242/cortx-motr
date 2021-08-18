@@ -174,7 +174,6 @@ static int libfab_check_for_comp(struct fid_cq *cq, uint32_t *ctx,
 				 m0_bindex_t *len, uint64_t *rem_cq_data);
 static void libfab_tm_fini(struct m0_net_transfer_mc *tm);
 static int libfab_buf_dom_reg(struct m0_net_buffer *nb, struct fid_domain *dp);
-static uint64_t libfab_destaddr_get(struct m0_fab__ep_name *epname);
 static void libfab_pending_bufs_send(struct m0_fab__ep *ep);
 static int libfab_target_notify(struct m0_fab__buf *buf);
 static int libfab_conn_init(struct m0_fab__ep *ep, struct m0_fab__tm *ma,
@@ -1972,7 +1971,7 @@ static int libfab_bdesc_encode(struct m0_fab__buf *buf)
 		return M0_RC(-ENOMEM);
 
 	fbd = (struct m0_fab__bdesc *)nbd->nbd_data;
-	libfab_ep_pton(&tm->ftm_pep->fep_name, &fbd->fbd_netaddr);
+	fbd->fbd_netaddr = tm->ftm_pep->fep_name_fmt_numeric;
 	fbd->fbd_buftoken = buf->fb_token;
 
 	fbd->fbd_iov_cnt = (uint32_t)seg_nr;
@@ -2064,18 +2063,6 @@ static int libfab_buf_dom_reg(struct m0_net_buffer *nb, struct fid_domain *dp)
 	fbp->fb_state = FAB_BUF_REGISTERED;
 
 	return M0_RC(ret);
-}
-
-/**
- * Get the destination address from the endpoint name
- */
-static uint64_t libfab_destaddr_get(struct m0_fab__ep_name *epname)
-{
-	uint64_t dst;
-
-	libfab_ep_pton(epname, &dst);
-	dst |= 0x02;	/* FI_SOCKADDR_IN */
-	return dst;
 }
 
 /**
@@ -2208,7 +2195,7 @@ static void libfab_conn_data_fill(struct m0_fab__conn_data *cd,
 	char  str_portal[10]={'\0'};
 	int   len;
 
-	libfab_ep_pton(&tm->ftm_pep->fep_name, &cd->fcd_netaddr);
+	cd->fcd_netaddr = tm->ftm_pep->fep_name_fmt_numeric;
 	if (strncmp(h_ptr, "0@lo", 4) == 0)
 		cd->fcd_iface = FAB_LO;
 	else {
@@ -2247,7 +2234,7 @@ static int libfab_conn_init(struct m0_fab__ep *ep, struct m0_fab__tm *ma,
 
 	aep = libfab_aep_get(ep);
 	if (aep->aep_tx_state == FAB_NOT_CONNECTED) {
-		dst = libfab_destaddr_get(&ep->fep_name);
+		dst = ep->fep_name_fmt_numeric | 0x02;
 		libfab_conn_data_fill(&cd, ma);
 
 		ret = fi_getopt(&aep->aep_txep->fid, FI_OPT_ENDPOINT,
