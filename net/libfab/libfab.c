@@ -128,8 +128,8 @@ static int libfab_ep_rxres_init(struct m0_fab__active_ep *aep,
 static int libfab_pep_res_init(struct m0_fab__passive_ep *pep,
 			       struct m0_fab__tm *tm, void *ctx);
 static struct m0_fab__ep *libfab_ep(struct m0_net_end_point *net);
-static bool libfab_ep_cmp(struct m0_fab__ep *ep, const char *name,
-			  struct m0_fab__ep_name *epname);
+static bool libfab_ep_cmp( struct m0_fab__ep *ep, const char *name,
+			  			   uint64_t *name_fmt_numeric );
 static int libfab_ep_find(struct m0_net_transfer_mc *tm, const char *name,
 			  struct m0_fab__ep_name *epn,
 			  struct m0_net_end_point **epp);
@@ -866,14 +866,12 @@ static inline struct m0_fab__ep *libfab_ep(struct m0_net_end_point *net)
  * a matching endpoint.
  */
 static bool libfab_ep_cmp(struct m0_fab__ep *ep, const char *name,
-			  struct m0_fab__ep_name *epname)
+			  uint64_t *name_fmt_numeric)
 {
 	bool ret = false;
 	M0_PRE(ep != NULL);
 	if (name == NULL) {
-		M0_ASSERT(epname != NULL);
-		if ((strcmp(ep->fep_name.fen_addr, epname->fen_addr) == 0) &&
-		    (strcmp(ep->fep_name.fen_port, epname->fen_port) == 0))
+		if(*name_fmt_numeric == ep->fep_name_fmt_numeric )
 			ret = true;
 	} else {
 		if (strcmp(ep->fep_name.fen_str_addr, name) == 0)
@@ -902,10 +900,14 @@ static int libfab_ep_find(struct m0_net_transfer_mc *tm, const char *name,
 	char                      ep_str[LIBFAB_ADDR_STRLEN_MAX + 9] = {'\0'};
 	char                     *wc = NULL;
 	int                       rc = 0;
+	uint64_t                  name_fmt_numeric = 0;
+
+	if( epn )
+		libfab_ep_pton(epn,&name_fmt_numeric); 
 
 	M0_ASSERT(libfab_tm_is_locked(tm->ntm_xprt_private));
 	net = m0_tl_find(m0_nep, net, &tm->ntm_end_points,
-			 libfab_ep_cmp(libfab_ep(net), name, epn));
+			 libfab_ep_cmp(libfab_ep(net), name, &name_fmt_numeric));
 
 	if (net == NULL) {
 		if (name != NULL)
@@ -1240,6 +1242,7 @@ static int libfab_active_ep_create(struct m0_fab__ep *ep, struct m0_fab__tm *tm)
 
 	net = &ep->fep_nep;
 	net->nep_tm = tm->ftm_ntm;
+	libfab_ep_pton( &ep->fep_name, &ep->fep_name_fmt_numeric);
 	m0_nep_tlink_init_at_tail(net, &tm->ftm_ntm->ntm_end_points);
 	net->nep_addr = (const char *)(&ep->fep_name.fen_str_addr);
 	m0_ref_init(&ep->fep_nep.nep_ref, 1, &libfab_ep_release);
@@ -2831,6 +2834,7 @@ static int libfab_ma_start(struct m0_net_transfer_mc *ntm, const char *name)
 		nep = &ftm->ftm_pep->fep_nep;
 		nep->nep_tm = ntm;
 
+		libfab_ep_pton( &ftm->ftm_pep->fep_name, &ftm->ftm_pep->fep_name_fmt_numeric);
 		m0_nep_tlink_init_at_tail(nep, &ntm->ntm_end_points);
 		ftm->ftm_pep->fep_nep.nep_addr = 
 					ftm->ftm_pep->fep_name.fen_str_addr;

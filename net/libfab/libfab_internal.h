@@ -224,6 +224,8 @@ struct m0_fab__fab {
 
 /**
  * Libfab structure of endpoint name
+ * <XPort:LNet/Libfab>:<IP_Addr>@<lo/tcp/o2ib>:<LNetSrvIDFixed:12345>:<TM_ID>:<Portal_ID>
+ * libfab:0@lo:12345:42:298  (Loopback)
  */
 struct m0_fab__ep_name {
 	/** IP address */
@@ -321,6 +323,9 @@ struct m0_fab__ep {
 	
 	/** ipaddr, port and strname */
 	struct m0_fab__ep_name     fep_name;
+
+	/** Name in format 64 bit <IP_Addr, 32bit>:<Port, 32 bit> */
+	uint64_t fep_name_fmt_numeric;
 	
 	/** Active endpoint */
 	struct m0_fab__active_ep  *fep_aep;
