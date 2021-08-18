@@ -159,6 +159,12 @@ enum m0_fab__ep_iface {
 	FAB_O2IB
 };
 
+enum m0_fab__ep_xport_type {
+	FAB_EP_XPORT_TYPE_NONE,
+	FAB_EP_XPORT_TYPE_VERBS,
+	FAB_EP_XPORT_TYPE_OTHERS
+};
+
 /**
  * Libfab structure for event context to be returned in the epoll_wait events
  */
@@ -208,6 +214,9 @@ struct m0_fab__ndom {
 struct m0_fab__fab {
 	/** Magic number for list of fabric interfaces in transfer machine*/
 	uint64_t           fab_magic;
+
+	/** Is transfer machine verbs */
+	enum m0_fab__ep_xport_type fab_xport_type;
 
 	/** Fabric interface info */
 	struct fi_info    *fab_fi;
