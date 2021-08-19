@@ -69,6 +69,8 @@ enum m0_fab__libfab_params {
 	FAB_VERBS_MAX_BULK_SEG_SIZE    = 1048576,
 	/** Max number of active work requests for Verbs */
 	FAB_VERBS_MAX_QUEUE_SIZE       = 224,
+	/** Number of SGL for Verbs */
+	FAB_VERBS_SGL_LIMIT 		   = 1, 
 
 	/** Max number of IOV in read/write command for TCP/Socket provider
 	 * (max number of segments) */
@@ -78,6 +80,8 @@ enum m0_fab__libfab_params {
 	FAB_TCP_SOCK_MAX_BULK_SEG_SIZE = 4096,
 	/** Max number of active work requests for TCP/Socket provider */
 	FAB_TCP_SOCK_MAX_QUEUE_SIZE    = 1024,
+	/** Number of SGL for TCP, note should match TCPX_IOV_LIMIT */
+	FAB_TCP_SOCK_SGL_LIMIT		   = 4, 
 
 	/** Max segment size for rpc buffer ( 1MB but can be changed ) */
 	FAB_MAX_RPC_SEG_SIZE           = (1 << 20),
