@@ -1178,27 +1178,67 @@ static void dix_next_ast(struct m0_sm_group *grp, struct m0_sm_ast *ast)
 	M0_LEAVE();
 }
 
+struct ast_wait {
+	struct m0_op_idx   *w_op;
+	struct m0_semaphore w_sem;
+};
+
+/* Cancels launched index operation by cancelling rpc items. */
+static void idx_op_cancel_ast(struct m0_sm_group *grp, struct m0_sm_ast *ast)
+{
+	struct ast_wait   *w  = ast->sa_datum;
+	struct m0_op_idx  *oi = w->w_op;
+	struct dix_req    *req;
+	struct m0_dix_req *dreq;
+
+	M0_ENTRY();
+	if (!oi->oi_in_completion) {
+		req = oi->oi_dix_req;
+		if (idx_is_distributed(oi)) {
+			dreq = req->idr_meta ? &req->idr_mreq.dmr_req :
+				&req->idr_dreq;
+			m0_dix_req_cancel(dreq);
+		} else {
+			cas_index_cancel(req);
+		}
+	}
+	m0_semaphore_up(&w->w_sem);
+	M0_LEAVE();
+}
+
 M0_INTERNAL int m0__idx_cancel(struct m0_op_idx *oi)
 {
+	struct m0_sm_ast   *op_ast;
 	struct dix_req     *req;
 	struct m0_dix_req  *dreq;
+	struct ast_wait     w;
 
 	M0_ENTRY();
 	M0_PRE(oi != NULL);
 
+	op_ast = &oi->oi_ast;
+	op_ast->sa_cb = idx_op_cancel_ast;
+	op_ast->sa_datum = &w;
+	w.w_op = oi;
+	m0_semaphore_init(&w.w_sem, 0);
 	req = oi->oi_dix_req;
-	dreq = req->idr_meta ? &req->idr_mreq.dmr_req : &req->idr_dreq;
+	dreq = req->idr_meta ? &req->idr_mreq.dmr_req :
+			       &req->idr_dreq;
 	/*
-	 * Do no post cancel ast when oi completion/fail already called and for
-	 * not handled types.
+	 * Do no post cancel ast when oi completion/fail
+	 * already called and for not handled types.
 	 */
-	if (!M0_IN(dreq->dr_type, (DIX_CREATE, DIX_DELETE, DIX_CCTGS_LOOKUP)) &&
+	if (!M0_IN(dreq->dr_type, (DIX_CREATE,
+				   DIX_DELETE,
+				   DIX_CCTGS_LOOKUP)) &&
 	    !oi->oi_in_completion) {
-		if (idx_is_distributed(oi))
-			m0_dix_req_cancel(dreq);
-		else
-			cas_index_cancel(req);
+		if (oi->oi_sm_grp != m0_locality_here()->lo_grp)
+			m0_sm_ast_post(oi->oi_sm_grp, op_ast);
+		else /* Call ast call-back synchronously. */
+			idx_op_cancel_ast(NULL, op_ast);
+		m0_semaphore_down(&w.w_sem);
 	}
+
 	return M0_RC(0);
 }
 
