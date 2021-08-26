@@ -1232,10 +1232,7 @@ M0_INTERNAL int m0__idx_cancel(struct m0_op_idx *oi)
 				   DIX_DELETE,
 				   DIX_CCTGS_LOOKUP)) &&
 	    !oi->oi_in_completion) {
-		if (oi->oi_sm_grp != m0_locality_here()->lo_grp)
-			m0_sm_ast_post(oi->oi_sm_grp, op_ast);
-		else /* Call ast call-back synchronously. */
-			idx_op_cancel_ast(NULL, op_ast);
+		m0_sm_ast_post(oi->oi_sm_grp, op_ast);
 		m0_semaphore_down(&w.w_sem);
 	}
 
