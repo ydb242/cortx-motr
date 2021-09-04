@@ -285,6 +285,7 @@ static void idx_op_complete_state_set(struct m0_sm_group *grp,
 			oi->oi_dtx = NULL;
 		}
 	}
+	m0_sm_ast_cancel(op_grp, &oi->oi_ast); /* Cancel cancellation. */
 	m0_sm_group_unlock(op_grp);
 
 	M0_LEAVE();
