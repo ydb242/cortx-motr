@@ -507,7 +507,7 @@ static void queueit(struct m0_sm_group *grp, struct m0_sm_ast *ast)
 	M0_PRE(m0_fom_phase(fom) == M0_FOM_PHASE_INIT);
 
 	addb2_introduce(fom);
-	m0_fom_locality_inc(fom);
+	//m0_fom_locality_inc(fom);
 	fom_ready(fom);
 }
 
@@ -634,6 +634,8 @@ M0_INTERNAL void m0_fom_queue(struct m0_fom *fom)
 	fom->fo_loc = dom->fd_localities[loc_idx];
 	fom->fo_loc_idx = loc_idx;
 	m0_fom_sm_init(fom);
+	M0_LOG(M0_DEBUG, "SHIPRA: my code being executed");
+	m0_fom_locality_inc(fom);
 	fom->fo_cb.fc_ast.sa_cb = &queueit;
 	m0_sm_ast_post(&fom->fo_loc->fl_group, &fom->fo_cb.fc_ast);
 }
