@@ -4438,7 +4438,7 @@ static struct mock_fd *get_fd(int ftype)
 			return fd;
 		}
 	}
-	M0_IMPOSSIBLE("No free fd.");
+	return NULL;
 }
 
 static int src_fdnum(const struct mock_fd *fd)
