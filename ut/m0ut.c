@@ -174,7 +174,7 @@ extern struct m0_ut_suite xcode_ff2c_ut;
 extern struct m0_ut_suite xcode_ut;
 extern struct m0_ut_suite sns_flock_ut;
 extern struct m0_ut_suite ut_suite_pi;
-extern struct m0_ut_suite *m0_net_sock_ut_build(void);
+M0_INTERNAL struct m0_ut_suite *m0_net_sock_ut_build(void);
 
 static void tests_add(struct m0_ut_module *m)
 {
