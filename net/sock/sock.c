@@ -2220,6 +2220,7 @@ static int sock_init(int fd, struct ep *src, struct ep *tgt, uint32_t flags)
 	struct ma   *ma = ep_ma(src);
 	struct ep   *ep = tgt ?: src;
 	struct sock *s;
+	int          st = src->e_a.a_socktype;
 	int          result;
 	int          state = S_INIT;
 
@@ -2247,7 +2248,7 @@ static int sock_init(int fd, struct ep *src, struct ep *tgt, uint32_t flags)
 			state = S_OPEN;
 		} else if (tgt == NULL) {
 			/* Listening. */
-			if (ep->e_a.a_socktype == SOCK_STREAM) {
+			if (st == SOCK_STREAM) {
 				result = SOP(listen, s->s_fd, 128);
 				if (result == 0)
 					/*
@@ -2258,19 +2259,20 @@ static int sock_init(int fd, struct ep *src, struct ep *tgt, uint32_t flags)
 				else
 					result = M0_ERR(-errno);
 			} else {
-				M0_ASSERT(ep->e_a.a_socktype == SOCK_DGRAM);
+				M0_ASSERT(st == SOCK_DGRAM);
 				state = S_OPEN;
 			}
 		} else {
 			struct sockaddr_storage sa = {};
-			M0_ASSERT(M0_IN(ep->e_a.a_socktype, (SOCK_STREAM,
-							     SOCK_DGRAM)));
+			M0_ASSERT(M0_IN(st, (SOCK_STREAM, SOCK_DGRAM)));
 			/* Connecting. */
 			addr_encode(&ep->e_a, (void *)&sa);
 			result = SOP(connect, s->s_fd, (void *)&sa, sizeof sa);
 			if (result == 0) {
 				state = S_OPEN;
 			} else if (errno == EINPROGRESS) {
+				/* Datagram sockets connect instantly. */
+				M0_ASSERT(st != SOCK_DGRAM);
 				/*
 				 * Will be writable on a successful connection,
 				 * will be writable and readable on a failure.
@@ -2778,18 +2780,18 @@ static int addr_parse_lnet(struct addr *addr, const char *name)
 	 * Deterministically combine portal and tmid into a unique 16-bit port
 	 * number (greater than 1024). Tricky.
 	 *
-	 * Port number is, in binary: tttttttttt1ppppp, that is, 10 bits of tmid
-	 * (which must be less than 1024), followed by a set bit (guaranteeing
-	 * that the port is not reserved), followed by 5 bits of (portal - 30),
-	 * so that portal must be in the range 30..61.
+	 * Port number is, in little-endian binary: tttttttttt1ppppp, that is,
+	 * 10 bits of tmid (which must be less than 1024), followed by a set bit
+	 * (guaranteeing that the port is not reserved), followed by 5 bits of
+	 * (portal - 30), so that portal must be in the range 30..61.
 	 */
 	if (tmid >= 1024 || (portal - 30) >= 32)
 		return M0_ERR_INFO(-EPROTO,
 				   "portal: %u, tmid: %u", portal, tmid);
 	sin.sin_port     = htons(tmid | (1 << 10) | ((portal - 30) << 11));
 	addr->a_family   = PF_INET;
-	addr->a_socktype = SOCK_STREAM;
-	addr->a_protocol = IPPROTO_TCP;
+	addr->a_socktype = SOCK_DGRAM; /* SOCK_STREAM */
+	addr->a_protocol = IPPROTO_UDP; /* IPPROTO_TCP */
 	autotm[tmid] = 1;
 	addr_decode(addr, (void *)&sin);
 	return M0_RC(0);
@@ -3004,10 +3006,6 @@ static int buf_accept(struct buf *buf, struct mover *m)
 		result = m0_bitmap_init(&buf->b_done, p->p_nr);
 		if (result != 0)
 			return result;
-		m->m_buf      = buf;
-		m->m_gen      = buf->b_gen;
-		buf->b_peer   = *src;
-		buf->b_length = p->p_totalsize;
 		result = ep_create(buf_ma(buf),
 				   &src->bd_addr, NULL, &buf->b_other);
 		if (result == 0) {
@@ -3017,6 +3015,8 @@ static int buf_accept(struct buf *buf, struct mover *m)
 			M0_CNT_INC(buf->b_other->e_r_buf);
 #endif
 		}
+		buf->b_peer   = *src;
+		buf->b_length = p->p_totalsize;
 	} else if (buf->b_done.b_nr != p->p_nr) {
 		result = M0_ERR(-EPROTO);
 	} else if (buf->b_length != p->p_totalsize) {
@@ -3027,6 +3027,10 @@ static int buf_accept(struct buf *buf, struct mover *m)
 		result = M0_ERR(-EPROTO);
 	} else if (m0_bitmap_get(&buf->b_done, p->p_idx)) {
 		result = M0_ERR(-EPROTO);
+	}
+	if (result == 0) {
+		m->m_buf = buf;
+		m->m_gen = buf->b_gen;
 	}
 	return result;
 }
@@ -3579,13 +3583,13 @@ static int pk_header_done(struct mover *m)
 		mover_init(w, ma, &writer_op);
 		w->m_buf = buf;
 		/*
-		 * Here a packet GET(src = ip0:port0:bd0, dst =_ip1:port1:bd1)
+		 * Here a packet GET(src = ip0:port0:bd0, dst = ip1:port1:bd1)
 		 * is received from ip0:ephemeral end-point. The data can be
 		 * sent back either through the ephemeral address or to a new
 		 * ip0:port0 end-point. For now, keep the number of sockets
 		 * minimal.
 		 */
-		if (true || ep_eq(m->m_sock->s_ep, &p->p_src.bd_addr))
+		if (ep_eq(m->m_sock->s_ep, &p->p_src.bd_addr))
 			result = ep_add(m->m_sock->s_ep, w);
 		else {
 			struct ep *ep;
@@ -3799,6 +3803,7 @@ static int dgram_pk(struct mover *self, struct sock *s)
 	self->m_nob = 0;
 	self->m_gen = 0;
 	self->m_buf = NULL;
+	M0_SET0(&self->m_pk);
 	if (self->m_scratch == NULL) {
 		self->m_scratch = m0_alloc(pk_size(self, s));
 		if (self->m_scratch == NULL)
@@ -3999,7 +4004,7 @@ static m0_time_t msec(m0_time_t a, m0_time_t b)
 static bool sock_ut(void)
 {
 	/*
-	 * Define failure injection point here and not in in_iu(), so that
+	 * Define failure injection point here and not in in_ut(), so that
 	 * function name is unique.
 	 */
 	return M0_FI_ENABLED("ut");
@@ -5107,7 +5112,7 @@ static void ut_buf_wait(struct ut_buf *ub)
 	m0_mutex_unlock(&m_ut_lock);
 }
 
-#define ST "stream"
+#define ST "dgram"
 static void smoke_with_1(const struct sock_ops *sop, struct sock_ut_conf *conf,
 			 bool canfail)
 {
@@ -5560,7 +5565,7 @@ static void g_op_select(void)
 
 	m0_semaphore_down(&g_op_free);
 	m0_mutex_lock(&m_ut_lock);
-	if (mock_rnd(20) < 15) {
+	if (0 && mock_rnd(20) < 15) {
 		b[0] = &g_buf[mock_rnd(2 * g_op_nr)];
 		m0_net_buffer_del(&b[0]->gb_buf,
 				  b[0]->gb_buf.nb_tm ?: &g_tm[0].gt_tm);
@@ -5703,7 +5708,6 @@ static void glaring_with(const struct sock_ops *sop, struct sock_ut_conf *conf,
 			g_op_select();
 		for (i = 0; i < square; ++i)
 			m0_semaphore_down(&g_op_free);
-		/*
 		printf("\npar-max: %i\n", g_par_max);
 		for (i = 0; i < ARRAY_SIZE(g_err); ++i) {
 			printf("%i: %i %"PRId64" %i %i %i %i %i %"PRId64"\n", i,
@@ -5712,7 +5716,6 @@ static void glaring_with(const struct sock_ops *sop, struct sock_ut_conf *conf,
 			       g_err[i].e_timeout, g_err[i].e_cancelled,
 			       g_err[i].e_error,   g_err[i].e_time);
 		}
-		*/
 		glaring_fini();
 	}
 }
