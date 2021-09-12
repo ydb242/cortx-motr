@@ -849,7 +849,7 @@ static void service_ctxs_destroy(struct m0_pools_common *pc)
 			rc = m0_reqh_service_disconnect_wait(ctx);
 			M0_ASSERT_INFO(M0_IN(rc, (0, -ECANCELED, -ETIMEDOUT,
 						  -EINVAL, -EHOSTUNREACH,
-						  -ECONNREFUSED, -EIO)),
+						  -ECONNREFUSED, -EIO, -EPIPE)),
 				       "rc=%d", rc);
 		}
 		m0_reqh_service_ctx_destroy(ctx);
