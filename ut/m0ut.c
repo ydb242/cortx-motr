@@ -323,6 +323,8 @@ static void tests_add(struct m0_ut_module *m)
 	m0_ut_add(m, &console_ut, true);
 }
 
+int m0_ut_seed = -1;
+
 int main(int argc, char *argv[])
 {
 	static struct m0 instance;
@@ -335,7 +337,6 @@ int main(int argc, char *argv[])
 	bool  finject_stats_before = false;
 	bool  finject_stats_after  = false;
 	bool  parse_trace          = false;
-	int   seed                 = -1;
 	int   count                = 1;
 	int   i;
 	const char *fault_point         = NULL;
@@ -380,7 +381,7 @@ int main(int argc, char *argv[])
 				),
 		    M0_FORMATARG('H', "shuffle test suites before execution. "
 				 "The argument is a seed value. "
-				 "0 to shuffle randomly", "%i", &seed),
+				 "0 to shuffle randomly", "%i", &m0_ut_seed),
 		    M0_FLAGARG('k', "keep the sandbox directory",
 				&ut->ut_keep_sandbox),
 		    M0_FLAGARG('c',
@@ -453,7 +454,7 @@ int main(int argc, char *argv[])
 				" time.\n");
 		return EXIT_FAILURE;
 	}
-	if (start_suite != NULL && seed != -1) {
+	if (start_suite != NULL && m0_ut_seed != -1) {
 		fprintf(stderr, "Error: -O and -H options are conflicting.\n");
 		return EXIT_FAILURE;
 	}
@@ -510,12 +511,12 @@ int main(int argc, char *argv[])
 
 	rc = 0;
 	for (i = 1; rc == 0 && i <= count; i++) {
-		if (seed != -1) {
-			if (seed == 0) {
-				seed = time(NULL) ^ (getpid() << 17);
-				printf("Seed: %i.\n", seed);
+		if (m0_ut_seed != -1) {
+			if (m0_ut_seed == 0) {
+				m0_ut_seed = time(NULL) ^ (getpid() << 17);
+				printf("Seed: %i.\n", m0_ut_seed);
 			}
-			m0_ut_shuffle(seed);
+			m0_ut_shuffle(m0_ut_seed);
 		}
 		if (start_suite != NULL)
 			m0_ut_start_from(start_suite);
