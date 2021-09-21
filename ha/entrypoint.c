@@ -560,7 +560,7 @@ static int ha_entrypoint_client_fom_tick(struct m0_fom *fom)
 			next_state = M0_HEC_FILL;
 		} else {
 			next_state = M0_HEC_UNAVAILABLE;
-			M0_LOG(M0_WARN, "rlk_rc=%d", ecl->ecl_rlink.rlk_rc);
+			M0_LOG(M0_DEBUG, "rlk_rc=%d", ecl->ecl_rlink.rlk_rc);
 		}
 		rc = M0_FSO_AGAIN;
 		break;
