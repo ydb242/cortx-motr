@@ -181,8 +181,8 @@ static void application_attribute_copy(struct m0_indexvec *rep_ivec,
 
 	/* Move ti index to rep index */
 	if (ti_cob_index != rep_index) 	{
-		M0_ASSERT (m0_ivec_cursor_move(&ti_cob_cursor,  rep_index - ti_cob_index) && 
-		           m0_ivec_cursor_move(&ti_goff_cursor, rep_index - ti_cob_index));
+		m0_ivec_cursor_move(&ti_cob_cursor,  rep_index - ti_cob_index);
+	        m0_ivec_cursor_move(&ti_goff_cursor, rep_index - ti_cob_index);
 	}
 
 	/**
