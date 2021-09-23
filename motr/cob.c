@@ -1875,6 +1875,12 @@ M0_INTERNAL int m0__obj_namei_send(struct m0_op_obj *oo)
 		 }
 	}
 
+	/*TODO: This is temporary fix for EOS-24831 till s3 changes are ready
+	 * Setting skip lookup flag always false, so it will allow to md cob
+	 * lookup always.
+	 */
+	skip_meta_data = false;
+
 	if (! skip_meta_data ) {
 	/* Send requests to services. */
 		rc = cob_req_send(cr);
