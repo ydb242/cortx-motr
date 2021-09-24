@@ -35,7 +35,7 @@ M0_INTERNAL int m0_calculate_md5_inc_context(
 		unsigned char *curr_context,
 		unsigned char *pi_value_without_seed)
 {
-#ifndef __KERNEL__
+#if HAS_MD5
 	MD5_CTX context;
 	int i, rc;
 
@@ -83,7 +83,7 @@ M0_INTERNAL int m0_calculate_md5_inc_context(
 	 * seeded checksum.
 	 */
 	if (pi_value_without_seed != NULL) {
-		/* 
+		/*
 		 * NOTE: MD5_final() changes the context itself and curr_context
 		 * should not be finalised, thus copy it and use it for MD5_final
 		 */
@@ -146,7 +146,7 @@ M0_INTERNAL int m0_calculate_md5_inc_context(
 M0_INTERNAL uint64_t m0_calculate_cksum_size(struct m0_generic_pi *pi)
 {
 	M0_ENTRY();
-#ifndef __KERNEL__
+#if HAS_MD5
 	switch (pi->pi_hdr.pih_type) {
 	case M0_PI_TYPE_MD5_INC_CONTEXT:
 		return sizeof(struct m0_md5_inc_context_pi);
@@ -174,7 +174,7 @@ int m0_client_calculate_pi(struct m0_generic_pi *pi,
 {
 	int rc = 0;
 	M0_ENTRY();
-#ifndef __KERNEL__
+#if HAS_MD5
 	switch (pi->pi_hdr.pih_type) {
 	case M0_PI_TYPE_MD5_INC_CONTEXT: {
 		struct m0_md5_inc_context_pi *md5_context_pi =
@@ -195,7 +195,7 @@ bool m0_calc_verify_cksum_one_unit(struct m0_generic_pi *pi,
                                    struct m0_pi_seed *seed,
                                    struct m0_bufvec *bvec)
 {
-#ifndef __KERNEL__
+#if HAS_MD5
 	switch (pi->pi_hdr.pih_type) {
 	case M0_PI_TYPE_MD5_INC_CONTEXT:
 	{

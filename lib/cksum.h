@@ -28,7 +28,14 @@
 #include "lib/vec.h"
 #include "fid/fid.h"
 #include "xcode/xcode_attr.h"
-#ifndef __KERNEL__
+
+#if !defined(__KERNEL__) && defined(USE_LINUX)
+#define HAS_MD5 (1)
+#else
+#define HAS_MD5 (0)
+#endif
+
+#if HAS_MD5
 #include <openssl/md5.h>
 #endif
 
@@ -86,7 +93,7 @@ struct m0_md5_pi {
 
         /* header for protection info */
         struct m0_pi_hdr pimd5_hdr;
-#ifndef __KERNEL__
+#if HAS_MD5
         /* protection value computed for the current data*/
         unsigned char    pimd5_value[MD5_DIGEST_LENGTH];
         /* structure should be 32 byte aligned */
@@ -99,7 +106,7 @@ struct m0_md5_inc_context_pi {
 
         /* header for protection info */
         struct m0_pi_hdr pimd5c_hdr;
-#ifndef __KERNEL__
+#if HAS_MD5
         /*context of previous data unit, required for checksum computation */
         unsigned char    pimd5c_prev_context[sizeof(MD5_CTX)];
         /* protection value computed for the current data unit.
