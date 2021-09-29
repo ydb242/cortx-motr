@@ -442,13 +442,11 @@ M0_INTERNAL int m0_rpc_session_establish(struct m0_rpc_session *session,
 	args->rse_sender_id = conn->c_sender_id;
 
 	session_0 = m0_rpc_conn_session0(conn);
+	session_state_set(session, M0_RPC_SESSION_ESTABLISHING);
 	rc = m0_rpc__fop_post(fop, session_0, &session_establish_item_ops,
 			      abs_timeout);
-	if (rc == 0) {
-		session_state_set(session, M0_RPC_SESSION_ESTABLISHING);
-	} else {
+	if (rc != 0)
 		session_failed(session, rc);
-	}
 	m0_fop_put(fop);
 
 	M0_POST(ergo(rc != 0, session_state(session) == M0_RPC_SESSION_FAILED));
@@ -478,8 +476,10 @@ static void session_failed(struct m0_rpc_session *session, int32_t error)
 					      M0_RPC_SESSION_ESTABLISHING,
 					      M0_RPC_SESSION_IDLE,
 					      M0_RPC_SESSION_BUSY,
+					      M0_RPC_SESSION_FAILED,
 					      M0_RPC_SESSION_TERMINATING)));
-	m0_sm_fail(&session->s_sm, M0_RPC_SESSION_FAILED, error);
+	if (session_state(session) != M0_RPC_SESSION_FAILED)
+		m0_sm_fail(&session->s_sm, M0_RPC_SESSION_FAILED, error);
 
 	M0_ASSERT(m0_rpc_session_invariant(session));
 }
