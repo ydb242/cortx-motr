@@ -20,6 +20,11 @@ regex="^([0-9]+)\.([0-9]+)\.([0-9]+)$"
 
 while getopts "hv:" arg; do
   case $arg in
+  adsfasdf
+  
+  asdfasdf
+  
+  
     h)
       echo "Usage:"
       echo "   -h            Help"
