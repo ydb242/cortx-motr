@@ -45,15 +45,15 @@ static struct m0_reqh_service *ufc_fdmi_service;
 /* ----------------------------------------------------------------
  * Tests
  * ---------------------------------------------------------------- */
-#define CLIENT_ENDPOINT_ADDR "0@lo:12345:34:*"
-#define SERVER_ENDPOINT_ADDR  "0@lo:12345:34:1"
+#define CLIENT_ENDPOINT_ADDR "inet:tcp:127.0.0.1@3001"
+#define SERVER_ENDPOINT_ADDR  "inet:tcp:127.0.0.1@3000"
 #define SERVER_ENDPOINT       M0_NET_XPRT_PREFIX_DEFAULT":"SERVER_ENDPOINT_ADDR
 
 #define SERVER_DB_NAME        "fdmi_filterc_ut.db"
 #define SERVER_STOB_NAME      "fdmi_filterc_ut.stob"
 #define SERVER_ADDB_STOB_NAME "linuxstob:fdmi_filterc_ut.addb_stob"
 #define SERVER_LOG_NAME       "fdmi_filterc_ut.log"
-#define SERVER_ENDPOINT_ADDR  "0@lo:12345:34:1"
+#define SERVER_ENDPOINT_ADDR  "inet:tcp:127.0.0.1@3000"
 
 #define CLIENT_DB_NAME        "fdmi_filterc_ut.db"
 

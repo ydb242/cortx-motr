@@ -39,7 +39,7 @@
 
 #define DUMMY_DBNAME      "dummy-db"
 #define DUMMY_COB_ID      20
-#define DUMMY_SERVER_ADDR "0@lo:12345:34:10"
+#define DUMMY_SERVER_ADDR "inet:tcp:127.0.0.1@3010"
 
 static struct m0_ut_rpc_mach_ctx rmach_ctx;
 static struct m0_fop_type m0_reqhut_dummy_fopt;

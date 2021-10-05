@@ -30,7 +30,7 @@
 
 #define DUMMY_DBNAME      "dummy-db"
 #define DUMMY_COB_ID      20
-#define DUMMY_SERVER_ADDR "0@lo:12345:34:10"
+#define DUMMY_SERVER_ADDR "inet:tcp:127.0.0.1@3001"
 
 extern struct m0_fom_type            stats_fom_type;
 extern const struct m0_fom_type_ops  fom_stats_type_ops;

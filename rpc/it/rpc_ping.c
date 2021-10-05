@@ -56,7 +56,7 @@
 #  include "module/instance.h"  /* m0 */
 #endif
 
-#define SERVER_ENDPOINT_ADDR "0@lo:12345:34:1"
+#define SERVER_ENDPOINT_ADDR "inet:tcp:127.0.0.1@3000"
 #define SERVER_ENDPOINT      M0_NET_XPRT_PREFIX_DEFAULT":"SERVER_ENDPOINT_ADDR
 
 #define SERVER_DB_FILE_NAME        "m0rpcping_server.db"
@@ -79,8 +79,8 @@ static bool      server_mode = false;
 #endif
 
 static bool  verbose           = false;
-static char *server_nid        = "0@lo";
-static char *client_nid        = "0@lo";
+static char *server_nid        = "inet:tcp:127.0.0.1";
+static char *client_nid        = "inet:tcp:127.0.0.1";
 static int   server_tmid       = 1;
 static int   client_tmid       = 2;
 static int   nr_client_threads = 1;
@@ -149,8 +149,16 @@ static int build_endpoint_addr(enum ep_type type,
 	if (buf_size > M0_NET_LNET_XEP_ADDR_LEN)
 		return -1;
 
-	snprintf(out_buf, buf_size, "%s:%d:%d:%d", nid, M0_NET_LNET_PID,
-		 M0_LNET_PORTAL, tmid);
+	if (USE_LIBFAB)
+	{
+		tmid += 3000;
+		snprintf(out_buf, buf_size, "%s@%d", nid, tmid);
+	}
+	else {
+		tmid += 3000;
+		snprintf(out_buf, buf_size, "%s:%d:%d:%d", nid, M0_NET_LNET_PID,
+			 M0_LNET_PORTAL, tmid);
+	}
 	if (verbose)
 		printf("%s endpoint: %s\n", ep_name, out_buf);
 

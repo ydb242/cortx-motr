@@ -224,8 +224,8 @@ int main(int argc, char **argv)
 
 	struct m0_rpc_client_ctx cctx = {
 		.rcx_net_dom               = &client_net_dom,
-		.rcx_local_addr            = "0@lo:12345:34:*",
-		.rcx_remote_addr           = "0@lo:12345:34:1",
+		.rcx_local_addr            = "inet:tcp:127.0.0.1@3000",
+		.rcx_remote_addr           = "inet:tcp:127.0.0.1@3001",
 		.rcx_max_rpcs_in_flight    = 1,
 		.rcx_fid                   = &M0_FID_TINIT(PROC_FT, 0, 1),
 	};

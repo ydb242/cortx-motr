@@ -42,7 +42,7 @@ enum {
 	NTC_CMD_RECV_WAIT_NS  = 25000000,
 };
 
-static const char   NTC_ADDR[]	   = "0@lo:12345:42:%d";
+static const char   NTC_ADDR[]	   = "inet:tcp:127.0.0.1@%d";
 static const size_t NTC_ADDR_LEN   = ARRAY_SIZE(NTC_ADDR);
 static const char   NTC_DELIM      = ',';
 
@@ -295,7 +295,7 @@ static void commands_ut_recv_type(struct net_test_cmd_node *node,
 		commands_ut_assert(node, m0_time_seconds(timeout) == 2);
 		commands_ut_assert(node, m0_time_nanoseconds(timeout) == 3);
 		commands_ut_assert(node, strncmp(cmd_init->ntci_tm_ep,
-					         "0@lo:1:2:3", 64) == 0);
+					         "inet:tcp:127.0.0.1@3000", 64) == 0);
 		/*
 		 * m0_net_test_slist serialize/deserialize already checked
 		 * in slist UT
@@ -407,7 +407,7 @@ static void commands_ut_send_all_type(size_t nr,
 		cmd_init->ntci_msg_size		= 0x100000;
 		cmd_init->ntci_msg_concurrency  = 0x100;
 		cmd_init->ntci_buf_send_timeout = M0_MKTIME(2, 3);
-		cmd_init->ntci_tm_ep		= "0@lo:1:2:3";
+		cmd_init->ntci_tm_ep		= "inet:tcp:127.0.0.1@3000";
 		m0_net_test_slist_init(&cmd_init->ntci_ep, "1,2,3", ',');
 	} else if (type != M0_NET_TEST_CMD_START &&
 		   type != M0_NET_TEST_CMD_STOP &&

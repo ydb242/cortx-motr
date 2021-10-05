@@ -37,9 +37,9 @@ char      *sns_cm_ut_svc_ad[] = {
 	"-A", "linuxstob:sr_addb_stob",
 	"-f", M0_UT_CONF_PROCESS,
 	"-w", "10",
-	"-G", M0_NET_XPRT_PREFIX_DEFAULT":0@lo:12345:34:1",
-	"-e", M0_NET_XPRT_PREFIX_DEFAULT":0@lo:12345:34:1",
-	"-H", "0@lo:12345:34:1",
+	"-G", M0_NET_XPRT_PREFIX_DEFAULT":inet:tcp:127.0.0.1@3000",
+	"-e", M0_NET_XPRT_PREFIX_DEFAULT":inet:tcp:127.0.0.1@3000",
+	"-H", "inet:tcp:127.0.0.1@3000",
 	"-c", M0_UT_PATH("conf.xc")
 };
 
@@ -49,9 +49,9 @@ char      *sns_cm_ut_svc_linux[] = {
 	"-A", "linuxstob:sr_addb_stob",
 	"-f", M0_UT_CONF_PROCESS,
 	"-w", "10",
-	"-G", M0_NET_XPRT_PREFIX_DEFAULT":0@lo:12345:34:1",
-	"-e", M0_NET_XPRT_PREFIX_DEFAULT":0@lo:12345:34:1",
-	"-H", "0@lo:12345:34:1",
+	"-G", M0_NET_XPRT_PREFIX_DEFAULT":inet:tcp:127.0.0.1@3000",
+	"-e", M0_NET_XPRT_PREFIX_DEFAULT":inet:tcp:127.0.0.1@3000",
+	"-H", "inet:tcp:127.0.0.1@3000",
 	"-c", M0_UT_PATH("conf.xc")
 };
 

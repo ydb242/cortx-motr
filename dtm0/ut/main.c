@@ -32,7 +32,7 @@
 #include "cas/cas_xc.h"
 
 #define M0_FID(c_, k_)  { .f_container = c_, .f_key = k_ }
-#define SERVER_ENDPOINT_ADDR   "0@lo:12345:34:1"
+#define SERVER_ENDPOINT_ADDR   "inet:tcp:127.0.0.1@3000"
 #define SERVER_ENDPOINT        M0_NET_XPRT_PREFIX_DEFAULT":"SERVER_ENDPOINT_ADDR
 #define DTM0_UT_CONF_PROCESS   "<0x7200000000000001:5>"
 #define DTM0_UT_LOG            "dtm0_ut_server.log"
@@ -45,7 +45,7 @@ struct m0_reqh  *dtm0_cli_srv_reqh;
 
 static struct m0_fid cli_srv_fid = M0_FID(0x7300000000000001, 0x1a);
 static struct m0_fid srv_dtm0_fid = M0_FID(0x7300000000000001, 0x1c);
-static const char *cl_ep_addr =  "0@lo:12345:34:2";
+static const char *cl_ep_addr =  "inet:tcp:127.0.0.1@3001";
 static const char *srv_ep_addr =  SERVER_ENDPOINT_ADDR;
 static char *dtm0_ut_argv[] = { "m0d", "-T", "linux",
 			       "-D", "dtm0_sdb", "-S", "dtm0_stob",

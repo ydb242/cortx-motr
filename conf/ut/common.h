@@ -27,9 +27,9 @@
 #include "conf/confc.h"  /* m0_confc_ctx */
 #include "lib/chan.h"    /* m0_clink */
 
-#define SERVER_ENDPOINT_ADDR "0@lo:12345:34:1"
+#define SERVER_ENDPOINT_ADDR "inet:tcp:127.0.0.1@3000"
 #define SERVER_ENDPOINT      M0_NET_XPRT_PREFIX_DEFAULT":"SERVER_ENDPOINT_ADDR
-#define CLIENT_ENDPOINT_ADDR "0@lo:12345:34:*"
+#define CLIENT_ENDPOINT_ADDR "inet:tcp:127.0.0.1@3001"
 
 extern struct m0_conf_cache m0_conf_ut_cache;
 extern struct m0_sm_group   m0_conf_ut_grp;

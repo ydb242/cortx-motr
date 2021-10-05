@@ -190,8 +190,8 @@ void prepare_rpc_env(struct test_rpc_env         *env,
 		TEST_TM_NR);
 	M0_ASSERT(rc == 0);
 
-	env->ep_addr_local  = "0@lo:12345:32:123";
-	env->ep_addr_remote = "0@lo:12345:32:123";
+	env->ep_addr_local  = "inet:tcp:127.0.0.1@3123";
+	env->ep_addr_remote = "inet:tcp:127.0.0.1@3123";
 	rc = m0_rpc_machine_init(&env->tre_rpc_machine,
 			         &env->tre_net_dom,
 				 env->ep_addr_local,

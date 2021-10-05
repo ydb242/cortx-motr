@@ -1188,7 +1188,7 @@ static int libfab_ep_find(struct m0_net_transfer_mc *tm, const char *name,
 			M0_ASSERT(epn != NULL);
 			M0_ASSERT((strlen(epn->fen_addr) + strlen(epn->fen_port)
 				  + 8) < LIBFAB_ADDR_STRLEN_MAX);
-			sprintf(ep_str, "libfab:%s:%s", epn->fen_addr,
+			sprintf(ep_str, "inet:tcp:%s@%s", epn->fen_addr,
 				epn->fen_port);
 			rc = libfab_ep_create(tm, ep_str, epn, epp);
 		}

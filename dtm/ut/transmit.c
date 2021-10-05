@@ -407,7 +407,7 @@ static void rpc_fop_fom_init(void)
 	m0_semaphore_init(&seq, 0);
 	test_ctx = (struct m0_ut_rpc_mach_ctx) {
 		.rmc_cob_id  = { 20 },
-		.rmc_ep_addr = "0@lo:12345:34:10"
+		.rmc_ep_addr = "inet:tcp:127.0.0.1@3010"
 	};
 	m0_ut_rpc_mach_init_and_add(&test_ctx);
 

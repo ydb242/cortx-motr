@@ -58,8 +58,8 @@
  *  Server side structures and objects
  */
 
-#define CLIENT_ENDPOINT_ADDR    "0@lo:12345:34:*"
-#define SERVER_ENDPOINT_ADDR    "0@lo:12345:34:1"
+#define CLIENT_ENDPOINT_ADDR    "inet:tcp:127.0.0.1@3001"
+#define SERVER_ENDPOINT_ADDR    "inet:tcp:127.0.0.1@3000"
 #define SERVER_DB_NAME		"reqh_ut_stob/sdb"
 #define SERVER_BDOM_LOCATION	"linuxstob:./reqh_fom_ut"
 #define SERVER_BDOM_KEY         0xBAC570BD

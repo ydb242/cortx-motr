@@ -155,15 +155,15 @@ void m0_net_test_network_ut_ping(void)
 	cfg.ntncfg_buf_ping_nr	 = 1;
 	cfg.ntncfg_ep_max	 = 1;
 	cfg.ntncfg_timeouts	 = m0_net_test_network_timeouts_never();
-	rc = m0_net_test_network_ctx_init(&send, &cfg, "0@lo:12345:42:1000");
+	rc = m0_net_test_network_ctx_init(&send, &cfg, "inet:tcp:127.0.0.1@3000");
 	M0_UT_ASSERT(rc == 0);
 
-	rc = m0_net_test_network_ctx_init(&recv, &cfg, "0@lo:12345:42:1001");
+	rc = m0_net_test_network_ctx_init(&recv, &cfg, "inet:tcp:127.0.0.1@3001");
 	M0_UT_ASSERT(rc == 0);
 
-	rc = m0_net_test_network_ep_add(&send, "0@lo:12345:42:1001");
+	rc = m0_net_test_network_ep_add(&send, "inet:tcp:127.0.0.1@3001");
 	M0_UT_ASSERT(rc == 0);
-	rc = m0_net_test_network_ep_add(&recv, "0@lo:12345:42:1000");
+	rc = m0_net_test_network_ep_add(&recv, "inet:tcp:127.0.0.1@3000");
 	M0_UT_ASSERT(rc == 0);
 
 	m0_semaphore_init(&recv_sem, 0);
@@ -262,15 +262,15 @@ void m0_net_test_network_ut_bulk(void)
 	cfg.ntncfg_buf_bulk_nr	 = 2;
 	cfg.ntncfg_ep_max	 = 1;
 	cfg.ntncfg_timeouts	 = m0_net_test_network_timeouts_never();
-	rc = m0_net_test_network_ctx_init(&client, &cfg, "0@lo:12345:42:1000");
+	rc = m0_net_test_network_ctx_init(&client, &cfg, "inet:tcp:127.0.0.1@3000");
 	M0_UT_ASSERT(rc == 0);
 	cfg.ntncfg_buf_bulk_nr = 1;
-	rc = m0_net_test_network_ctx_init(&server, &cfg, "0@lo:12345:42:1001");
+	rc = m0_net_test_network_ctx_init(&server, &cfg, "inet:tcp:127.0.0.1@3001");
 	M0_UT_ASSERT(rc == 0);
 
-	rc = m0_net_test_network_ep_add(&client, "0@lo:12345:42:1001");
+	rc = m0_net_test_network_ep_add(&client, "inet:tcp:127.0.0.1@3001");
 	M0_UT_ASSERT(rc == 0);
-	rc = m0_net_test_network_ep_add(&server, "0@lo:12345:42:1000");
+	rc = m0_net_test_network_ep_add(&server, "inet:tcp:127.0.0.1@3000");
 	M0_UT_ASSERT(rc == 0);
 
 	/* start of bulk send/recv */
@@ -467,7 +467,7 @@ void m0_net_test_network_ut_buf_desc(void)
 	cfg.ntncfg_buf_bulk_nr	 = 4;
 	cfg.ntncfg_ep_max	 = 1;
 	cfg.ntncfg_timeouts	 = m0_net_test_network_timeouts_never();
-	rc = m0_net_test_network_ctx_init(&ctx, &cfg, "0@lo:12345:42:*");
+	rc = m0_net_test_network_ctx_init(&ctx, &cfg, "inet:tcp:127.0.0.1@3000");
 	M0_UT_ASSERT(rc == 0);
 
 	/* add some ep - tranfer machine ep */
@@ -521,11 +521,10 @@ void m0_net_test_network_ut_addr_decode(void)
 		cfg.ntncfg_ep_max	 = 10;
 		cfg.ntncfg_timeouts	 = m0_net_test_network_timeouts_never();
 
-		rc = m0_net_test_network_ctx_init(&send, &cfg, "0@lo:12345:42:3000");
+		rc = m0_net_test_network_ctx_init(&send, &cfg, "inet:tcp:127.0.0.1@3000");
 		M0_UT_ASSERT(rc == 0);
 
-		/* decode: lnet addressing format*/
-		rc = m0_net_test_network_ep_add(&send, "0@lo:12345:42:3001");
+		rc = m0_net_test_network_ep_add(&send, "inet:tcp:127.0.0.1@3001");
 		M0_UT_ASSERT(rc == 0);
 
 		/* decode: inet addresses of type tcp*/

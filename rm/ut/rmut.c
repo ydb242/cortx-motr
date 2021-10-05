@@ -40,10 +40,10 @@
 
 extern const struct m0_tl_descr m0_remotes_tl;
 
-const char *serv_addr[] = { "0@lo:12345:34:1",
-			    "0@lo:12345:34:2",
-			    "0@lo:12345:34:3",
-			    "0@lo:12345:34:4"
+const char *serv_addr[] = { "inet:tcp:127.0.0.1@3001",
+			    "inet:tcp:127.0.0.1@3002",
+			    "inet:tcp:127.0.0.1@3003",
+			    "inet:tcp:127.0.0.1@3004"
 };
 
 const int cob_ids[] = { 20, 30, 40, 50 };

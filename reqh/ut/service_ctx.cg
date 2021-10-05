@@ -6,26 +6,26 @@
 (node-2 memsize=16000 nr_cpu=2 last_state=3 flags=2
     processes=[process-5, process-6])
 (process-5 cores=[3] mem_limit_as=0 mem_limit_rss=0 mem_limit_stack=0
-    mem_limit_memlock=0 endpoint="0@lo:12345:34:1"
+    mem_limit_memlock=0 endpoint="inet:tcp:127.0.0.1@3000"
     services=[service-9, service-10, service-20, service-21,
               service-22, service-23, service-24, service-25, service-26])
 (process-6 cores=[3] mem_limit_as=0 mem_limit_rss=0 mem_limit_stack=0
-    mem_limit_memlock=0 endpoint="0@lo:12345:34:999" services=[service-27])
-(service-9 type=@M0_CST_IOS endpoints=["0@lo:12345:34:1"] params=[]
+    mem_limit_memlock=0 endpoint="inet:tcp:127.0.0.1@3999" services=[service-27])
+(service-9 type=@M0_CST_IOS endpoints=["inet:tcp:127.0.0.1@3000"] params=[]
     sdevs=[sdev-15, sdev-71, sdev-72, sdev-73, sdev-74])
-(service-10 type=@M0_CST_MDS endpoints=["0@lo:12345:34:1"] params=[]
+(service-10 type=@M0_CST_MDS endpoints=["inet:tcp:127.0.0.1@3000"] params=[]
     sdevs=[sdev-13, sdev-14])
-(service-20 type=@M0_CST_CONFD endpoints=["0@lo:12345:34:1"] params=[] sdevs=[])
-(service-21 type=@M0_CST_ADDB2 endpoints=["0@lo:12345:34:1"] params=[] sdevs=[])
-(service-22 type=@M0_CST_RMS endpoints=["0@lo:12345:34:1"] params=[] sdevs=[])
-(service-23 type=@M0_CST_HA endpoints=["0@lo:12345:34:1"] params=[] sdevs=[])
-(service-24 type=@M0_CST_SNS_REP endpoints=["0@lo:12345:34:1"] params=[]
+(service-20 type=@M0_CST_CONFD endpoints=["inet:tcp:127.0.0.1@3000"] params=[] sdevs=[])
+(service-21 type=@M0_CST_ADDB2 endpoints=["inet:tcp:127.0.0.1@3000"] params=[] sdevs=[])
+(service-22 type=@M0_CST_RMS endpoints=["inet:tcp:127.0.0.1@3000"] params=[] sdevs=[])
+(service-23 type=@M0_CST_HA endpoints=["inet:tcp:127.0.0.1@3000"] params=[] sdevs=[])
+(service-24 type=@M0_CST_SNS_REP endpoints=["inet:tcp:127.0.0.1@3000"] params=[]
     sdevs=[])
-(service-25 type=@M0_CST_SNS_REB endpoints=["0@lo:12345:34:1"] params=[]
+(service-25 type=@M0_CST_SNS_REB endpoints=["inet:tcp:127.0.0.1@3000"] params=[]
     sdevs=[])
-(service-26 type=@M0_CST_DS1 endpoints=["0@lo:12345:34:1"] params=[]
+(service-26 type=@M0_CST_DS1 endpoints=["inet:tcp:127.0.0.1@3000"] params=[]
     sdevs=[sdev-96, sdev-97])
-(service-27 type=@M0_CST_DS1 endpoints=["0@lo:12345:34:999"] params=[] sdevs=[])
+(service-27 type=@M0_CST_DS1 endpoints=["inet:tcp:127.0.0.1@3999"] params=[] sdevs=[])
 (sdev-96 dev_idx=1 iface=4 media=1 bsize=4096 size=0 last_state=3 flags=4
     filename="/var/motr/m0ut/ut-sandbox/d1")
 (sdev-97 dev_idx=2 iface=4 media=1 bsize=4096 size=0 last_state=3 flags=4
@@ -71,11 +71,11 @@ ctrls=[controller-11] pvers=[pver-8])
 (objv-82 real=drive-78 children=[])
 (node-48 memsize=16000 nr_cpu=2 last_state=3 flags=2 processes=[process-49])
 (process-49 cores=[3] mem_limit_as=0 mem_limit_rss=0 mem_limit_stack=0
-    mem_limit_memlock=0 endpoint="0@lo:12345:34:1"
+    mem_limit_memlock=0 endpoint="inet:tcp:127.0.0.1@3000"
     services=[service-28, service-29])
-(service-28 type=@M0_CST_IOS endpoints=["0@lo:12345:34:1"] params=[]
+(service-28 type=@M0_CST_IOS endpoints=["inet:tcp:127.0.0.1@3000"] params=[]
     sdevs=[sdev-51, sdev-83, sdev-84, sdev-85, sdev-86])
-(service-29 type=@M0_CST_DIX_REB endpoints=["0@lo:12345:34:1"] params=[]
+(service-29 type=@M0_CST_DIX_REB endpoints=["inet:tcp:127.0.0.1@3000"] params=[]
     sdevs=[])
 (sdev-51 dev_idx=6 iface=4 media=1 bsize=4096 size=1073741824 last_state=3
     flags=4 filename="/dev/sdev0")
