@@ -1274,7 +1274,7 @@ static int stob_ad_read_prepare(struct m0_stob_io        *io,
 	seg    = m0_be_emap_seg_get(it);
 	back   = &aio->ai_back;
 
-	M0_LOG(M0_DEBUG, "ext="EXT_F" val=0x%llx",
+	M0_LOG(M0_DEBUG, "ext= "EXT_F" val=0x%llx",
 		EXT_P(&seg->ee_ext), (unsigned long long)seg->ee_val);
 
 	frags = frags_not_empty = 0;
