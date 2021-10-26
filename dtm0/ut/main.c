@@ -156,7 +156,7 @@ static void dtm0_ut_send_fops(struct m0_rpc_session *cl_rpc_session)
 	m0_fop_put_lock(fop);
 }
 
-static void dtm0_ut_client_init(struct cl_ctx *cctx, const char *cl_ep_addr,
+void dtm0_ut_client_init(struct cl_ctx *cctx, const char *cl_ep_addr,
 				const char *srv_ep_addr,
 				struct m0_net_xprt *xprt)
 {
@@ -181,7 +181,7 @@ static void dtm0_ut_client_init(struct cl_ctx *cctx, const char *cl_ep_addr,
 	M0_UT_ASSERT(rc == 0);
 }
 
-static void dtm0_ut_client_fini(struct cl_ctx *cctx)
+void dtm0_ut_client_fini(struct cl_ctx *cctx)
 {
 	int rc;
 
@@ -306,10 +306,13 @@ static void cas_xcode_test(void)
     m0_xcode_free_obj(&M0_XCODE_OBJ(m0_cas_op_xc, op_out));
 }
 
+extern void m0_dtm0_ut_drlink_simple();
+
 struct m0_ut_suite dtm0_ut = {
         .ts_name = "dtm0-ut",
         .ts_tests = {
-                { "xcode",   cas_xcode_test },
+                { "xcode",         &cas_xcode_test },
+                { "drlink-simple", &m0_dtm0_ut_drlink_simple },
 		{ NULL, NULL },
 	}
 };
