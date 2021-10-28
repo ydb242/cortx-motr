@@ -1618,6 +1618,7 @@ static int rconfc_herd_update(struct m0_rconfc   *rconfc,
 	struct rconfc_link *lnk;
 	uint32_t            count = rconfc_confd_count(confd_addr);
 	uint32_t            idx;
+        uint32_t            link_quorum = 0;
 
 	M0_ENTRY("rconfc = %p, confd_addr[] = %p, [confd_addr] = %u",
 		 rconfc, confd_addr, count);
@@ -1675,6 +1676,14 @@ static int rconfc_herd_update(struct m0_rconfc   *rconfc,
 			} else {
 				M0_ASSERT(lnk->rl_state == CONFC_DEAD);
 			}
+		}
+		if (lnk->rl_rc == 0)
+			link_quorum++;
+		if (link_quorum < rconfc->rc_quorum) {
+			rconfc_herd_prune(rconfc);
+			/** TODO YJC: change to error instead of always */
+			M0_LOG(M0_ALWAYS, "Quorum of confd are not available, retry entrypoint request.. ");
+			return M0_RC(-EAGAIN);
 		}
 		lnk->rl_preserve = true;
 	}
