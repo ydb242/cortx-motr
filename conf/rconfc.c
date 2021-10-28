@@ -1679,17 +1679,13 @@ static int rconfc_herd_update(struct m0_rconfc   *rconfc,
 		}
 		if (lnk->rl_rc == 0)
 			link_quorum++;
-		if (link_quorum < rconfc->rc_quorum) {
-			rconfc_herd_prune(rconfc);
-			/** TODO YJC: change to error instead of always */
-			M0_LOG(M0_ALWAYS, "Quorum of confd are not available, retry entrypoint request.. ");
-			return M0_RC(-EAGAIN);
-		}
 		lnk->rl_preserve = true;
 	}
+   	
 	ver_accm_init(rconfc->rc_qctx, count);
 	m0_tl_for (rcnf_herd, &rconfc->rc_herd, lnk) {
-		if (!lnk->rl_preserve) {
+		if (!lnk->rl_preserve || 
+		     link_quorum < rconfc->rc_quorum) {
 			rconfc_herd_link_fini(lnk);
 			rcnf_herd_tlist_del(lnk);
 			rconfc_herd_link_destroy(lnk);
@@ -1703,6 +1699,10 @@ static int rconfc_herd_update(struct m0_rconfc   *rconfc,
 			lnk->rl_preserve = false;
 		}
 	} m0_tl_endfor;
+	if (link_quorum < rconfc->rc_quorum) {
+		M0_LOG(M0_DEBUG, "rc_quorum = %d", rconfc->rc_quorum);
+		return M0_RC(-EAGAIN);
+	}
 	return m0_tl_exists(rcnf_herd, lnk, &rconfc->rc_herd,
 			    lnk->rl_state != CONFC_DEAD) ? M0_RC(0) :
 							   M0_ERR(-ENOENT);
