@@ -2035,6 +2035,10 @@ static void rconfc_owner_creditor_reset(struct m0_sm_group *grp M0_UNUSED,
 	struct rlock_ctx *rlx    = rconfc->rc_rlock_ctx;
 
 	M0_ENTRY("rconfc = %p", rconfc);
+	if (rlock_ctx_creditor_state(rlx) == ROS_ACTIVE) {
+		rlock_ctx_owner_windup(rlx);
+		m0_rm_rwlock_owner_fini(&rlx->rlc_owner);
+	}
 	rlock_ctx_creditor_unset(rlx);
 	/*
 	 * Start conf reelection.
@@ -2765,14 +2769,11 @@ static void rconfc_read_lock_complete(struct m0_rm_incoming *in, int32_t rc)
 		rconfc_ast_post(rconfc, rconfc_version_elect);
 	else if (rlock_ctx_creditor_state(rlx) == ROS_ACTIVE) {
 		if (rc == -ECONNREFUSED) {
-			struct m0_rm_incoming *rlc_req = &rlx->rlc_req;
-
 			/** Reset rm request to do the retry operation. */
 			M0_LOG(M0_DEBUG, "retrying read lock request because of \
                                           connection refused error");
-			rlc_req->rin_rc = 0;
-			rlc_req->rin_sm.sm_rc = 0;
-			m0_rm_credit_get(&rlx->rlc_req);
+			M0_CNT_INC(rconfc->rc_ha_entrypoint_retries);
+			rconfc_ast_post(rconfc, rconfc_owner_creditor_reset);
 		} else {
 			rconfc_fail_ast(rconfc, rc);
 		}
