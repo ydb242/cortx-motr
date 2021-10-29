@@ -2760,9 +2760,12 @@ static void rconfc_read_lock_complete(struct m0_rm_incoming *in, int32_t rc)
 	m0_rconfc_lock(rconfc);
 	if (rc == 0)
 		rconfc_ast_post(rconfc, rconfc_version_elect);
-	else if (rlock_ctx_creditor_state(rlx) == ROS_ACTIVE)
-		rconfc_fail_ast(rconfc, rc);
-	else
+	else if (rlock_ctx_creditor_state(rlx) == ROS_ACTIVE) {
+		if (rc == -ECONNREFUSED)
+			m0_rm_credit_get(&rlx->rlc_req);
+		else
+			rconfc_fail_ast(rconfc, rc);
+	} else
 		/* Creditor is considered dead by HA */
 		rconfc_creditor_death_handle(rconfc);
 	m0_rconfc_unlock(rconfc);
