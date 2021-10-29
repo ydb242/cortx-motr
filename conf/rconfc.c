@@ -1682,6 +1682,8 @@ static int rconfc_herd_update(struct m0_rconfc   *rconfc,
 		lnk->rl_preserve = true;
 	}
    	
+	M0_LOG(M0_DEBUG, "rconfc: link_quorum = %d rc_quorum = %d",
+                          link_quorum, rconfc->rc_quorum);
 	ver_accm_init(rconfc->rc_qctx, count);
 	m0_tl_for (rcnf_herd, &rconfc->rc_herd, lnk) {
 		if (!lnk->rl_preserve || 
@@ -1700,7 +1702,8 @@ static int rconfc_herd_update(struct m0_rconfc   *rconfc,
 		}
 	} m0_tl_endfor;
 	if (link_quorum < rconfc->rc_quorum) {
-		M0_LOG(M0_DEBUG, "rc_quorum = %d", rconfc->rc_quorum);
+		M0_LOG(M0_DEBUG, "rc_quorum = %d, retrying entrypoint.. ",
+                                  rconfc->rc_quorum);
 		return M0_RC(-EAGAIN);
 	}
 	return m0_tl_exists(rcnf_herd, lnk, &rconfc->rc_herd,
@@ -2761,10 +2764,18 @@ static void rconfc_read_lock_complete(struct m0_rm_incoming *in, int32_t rc)
 	if (rc == 0)
 		rconfc_ast_post(rconfc, rconfc_version_elect);
 	else if (rlock_ctx_creditor_state(rlx) == ROS_ACTIVE) {
-		if (rc == -ECONNREFUSED)
+		if (rc == -ECONNREFUSED) {
+			struct m0_rm_incoming *rlc_req = &rlx->rlc_req;
+
+			/** Reset rm request to do the retry operation. */
+			M0_LOG(M0_DEBUG, "retrying read lock request because of \
+                                          connection refused error");
+			rlc_req->rin_rc = 0;
+			rlc_req->rin_sm.sm_rc = 0;
 			m0_rm_credit_get(&rlx->rlc_req);
-		else
+		} else {
 			rconfc_fail_ast(rconfc, rc);
+		}
 	} else
 		/* Creditor is considered dead by HA */
 		rconfc_creditor_death_handle(rconfc);
