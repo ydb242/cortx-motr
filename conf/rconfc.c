@@ -1033,7 +1033,7 @@ static int rlock_ctx_creditor_setup(struct rlock_ctx *rlx,
 
 	M0_ENTRY("rconfc = %p, rlx = %p, ep = %s", rlx->rlc_parent, rlx, ep);
 	M0_PRE(M0_IN(rlock_ctx_creditor_state(rlx),
-		     (ROS_ACTIVE, ROS_DEAD_CREDITOR)));
+		     (ROS_FINAL, ROS_ACTIVE, ROS_DEAD_CREDITOR)));
 	rc = rlock_ctx_connect(rlx, ep);
 	if (rc != 0) {
 		_confc_phony_cache_remove(&rlx->rlc_parent->rc_phony, fid);
