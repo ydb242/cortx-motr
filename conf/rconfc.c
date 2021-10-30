@@ -93,6 +93,7 @@
  *      "M0_RCS_ENTRYPOINT_CONSUME" -> "M0_RCS_FAILURE"
  *      "M0_RCS_CREDITOR_SETUP" -> "M0_RCS_GET_RLOCK"
  *      "M0_RCS_CREDITOR_SETUP" -> "M0_RCS_ENTRYPOINT_WAIT"
+ *      "M0_RCS_GET_RLOCK" -> "M0_RCS_GET_RLOCK"
  *      "M0_RCS_GET_RLOCK" -> "M0_RCS_VERSION_ELECT"
  *      "M0_RCS_GET_RLOCK" -> "M0_RCS_ENTRYPOINT_WAIT"
  *      "M0_RCS_GET_RLOCK" -> "M0_RCS_FAILURE"
@@ -603,7 +604,7 @@ static struct m0_sm_state_descr rconfc_states[] = {
 	},
 	[M0_RCS_GET_RLOCK] = {
 		.sd_name      = "M0_RCS_GET_RLOCK",
-		.sd_allowed   = M0_BITS(M0_RCS_VERSION_ELECT,
+		.sd_allowed   = M0_BITS(M0_RCS_VERSION_ELECT, M0_RCS_GET_RLOCK,
 					M0_RCS_ENTRYPOINT_WAIT, M0_RCS_FAILURE),
 	},
 	[M0_RCS_VERSION_ELECT] = {
@@ -1033,7 +1034,7 @@ static int rlock_ctx_creditor_setup(struct rlock_ctx *rlx,
 
 	M0_ENTRY("rconfc = %p, rlx = %p, ep = %s", rlx->rlc_parent, rlx, ep);
 	M0_PRE(M0_IN(rlock_ctx_creditor_state(rlx),
-		     (ROS_FINAL, ROS_ACTIVE, ROS_DEAD_CREDITOR)));
+		     (ROS_ACTIVE, ROS_DEAD_CREDITOR)));
 	rc = rlock_ctx_connect(rlx, ep);
 	if (rc != 0) {
 		_confc_phony_cache_remove(&rlx->rlc_parent->rc_phony, fid);
@@ -2028,6 +2029,17 @@ static void rconfc_start_ast_cb(struct m0_sm_group *grp M0_UNUSED,
 	M0_LEAVE();
 }
 
+static void rconfc_read_lock_retry(struct m0_sm_group *grp M0_UNUSED,
+                                   struct m0_sm_ast *ast)
+{
+	struct m0_rconfc *rconfc = ast->sa_datum;
+
+	M0_ENTRY("rconfc = %p", rconfc);
+	rconfc_state_set(rconfc, M0_RCS_GET_RLOCK);
+	rconfc_read_lock_get(rconfc);
+	M0_LEAVE();
+}
+
 static void rconfc_owner_creditor_reset(struct m0_sm_group *grp M0_UNUSED,
 					struct m0_sm_ast   *ast)
 {
@@ -2035,9 +2047,6 @@ static void rconfc_owner_creditor_reset(struct m0_sm_group *grp M0_UNUSED,
 	struct rlock_ctx *rlx    = rconfc->rc_rlock_ctx;
 
 	M0_ENTRY("rconfc = %p", rconfc);
-	if (rlock_ctx_creditor_state(rlx) == ROS_ACTIVE) {
-		rlock_ctx_owner_windup(rlx);
-	}
 	rlock_ctx_creditor_unset(rlx);
 	/*
 	 * Start conf reelection.
@@ -2771,8 +2780,8 @@ static void rconfc_read_lock_complete(struct m0_rm_incoming *in, int32_t rc)
 			/** Reset rm request to do the retry operation. */
 			M0_LOG(M0_DEBUG, "retrying read lock request because of \
                                           connection refused error");
+			rconfc_ast_post(rconfc, rconfc_read_lock_retry);
 			M0_CNT_INC(rconfc->rc_ha_entrypoint_retries);
-			rconfc_ast_post(rconfc, rconfc_owner_creditor_reset);
 		} else {
 			rconfc_fail_ast(rconfc, rc);
 		}
