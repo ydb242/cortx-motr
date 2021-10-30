@@ -1704,7 +1704,7 @@ __rpm_mock:
 # __rpm_tests should be built before __rpm, because __rpm_tests creates a dummy
 # motr.rpm package, which would otherwise overwrite normal motr.rpm, created by
 # __rpm
-.PHONY: rpms
+.PHONY: rpms-tests
 rpms:
 	$(MAKE) __rpm_pre
 	$(MAKE) __rpm_ivt
@@ -1713,16 +1713,10 @@ rpms:
 	$(MAKE) __rpm_srpm
 	$(MAKE) __rpm_post
 
-.PHONY: rpms-notests
+.PHONY: rpms
 rpms-notests:
 	$(MAKE) __rpm_pre
 	$(MAKE) __rpm
-	$(MAKE) __rpm_post
-
-.PHONY: rpms-tests
-rpms-tests:
-	$(MAKE) __rpm_pre
-	$(MAKE) __rpm_tests
 	$(MAKE) __rpm_post
 
 .PHONY: rpms-ivt
