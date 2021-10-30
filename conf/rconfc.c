@@ -2037,7 +2037,6 @@ static void rconfc_owner_creditor_reset(struct m0_sm_group *grp M0_UNUSED,
 	M0_ENTRY("rconfc = %p", rconfc);
 	if (rlock_ctx_creditor_state(rlx) == ROS_ACTIVE) {
 		rlock_ctx_owner_windup(rlx);
-		m0_rm_rwlock_owner_fini(&rlx->rlc_owner);
 	}
 	rlock_ctx_creditor_unset(rlx);
 	/*
