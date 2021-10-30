@@ -1705,7 +1705,7 @@ __rpm_mock:
 # motr.rpm package, which would otherwise overwrite normal motr.rpm, created by
 # __rpm
 .PHONY: rpms-tests
-rpms:
+rpms-tests:
 	$(MAKE) __rpm_pre
 	$(MAKE) __rpm_ivt
 	$(MAKE) __rpm_tests
@@ -1714,7 +1714,7 @@ rpms:
 	$(MAKE) __rpm_post
 
 .PHONY: rpms
-rpms-notests:
+rpms:
 	$(MAKE) __rpm_pre
 	$(MAKE) __rpm
 	$(MAKE) __rpm_post
