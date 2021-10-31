@@ -67,8 +67,8 @@ enum {
 	MIN_ADDB2_RECORD_SIZE = 10ULL << 20,
 	/** Max ADDB Record record size in bytes (10G) */
 	MAX_ADDB2_RECORD_SIZE = 10ULL << 30,
-	/** Default Client ADDB Record record size in bytes (128M) */
-	DEFAULT_CLIENT_ADDB2_RECORD_SIZE = 128ULL << 20,
+	/** Default Client ADDB Record record size in bytes (64M) */
+	DEFAULT_CLIENT_ADDB2_RECORD_SIZE = 64ULL << 20,
 };
 
 struct m0_fop;
