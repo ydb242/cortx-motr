@@ -371,7 +371,7 @@ static void initlift_move_next_floor(struct m0_client *m0c)
 			   initlift_get_next_floor(m0c));
 	
 	end = m0_time_now();
-	M0_LOG(M0_ALWAYS,"floor :%d start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64, floor++,
+	M0_LOG(M0_ERROR,"floor :%d start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64, floor++,
 		start, end, m0_time_sub(end, start));
 }
 
@@ -1580,7 +1580,7 @@ int m0_client_init(struct m0_client **m0c_p,
 	m0c->m0c_initlift_direction = STARTUP;
         
 	end = m0_time_now();
-	M0_LOG(M0_ALWAYS,"motr client init before lift start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64,
+	M0_LOG(M0_ERROR,"motr client init before lift start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64,
 		start, end, m0_time_sub(end, start));
 
 	initlift_move_next_floor(m0c);
@@ -1603,7 +1603,7 @@ int m0_client_init(struct m0_client **m0c_p,
 		 */
 		ha_process_event(m0c, M0_CONF_HA_PROCESS_STARTED);
 	end = m0_time_now();
-	M0_LOG(M0_ALWAYS,"motr client init after lift start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64,
+	M0_LOG(M0_ERROR,"motr client init after lift start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64,
 		start, end, m0_time_sub(end, start));
 		/*
 		   For m0crate, s3servers and other client apps,

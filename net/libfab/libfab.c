@@ -942,6 +942,10 @@ static void libfab_poller(struct m0_fab__tm *tm)
 	struct epoll_event        ev;
 	int                       ev_cnt;
 	int                       ret;
+	bool                     chk = m0_processor_is_vm();
+
+	if (chk)
+		M0_LOG(M0_ERROR, "system mode is :%s", chk ? "VM" : "HW");
 
 	libfab_tm_event_post(tm, M0_NET_TM_STARTED);
 	while (tm->ftm_state != FAB_TM_SHUTDOWN) {
@@ -951,7 +955,7 @@ static void libfab_poller(struct m0_fab__tm *tm)
 		 * The proposed short term fix to support the lab team is adding
 		 * nanosleep of 0ns on VM to reduce CPU load.
 		 */
-		if (m0_processor_is_vm())
+		if (chk)
 			m0_nanosleep(M0_MKTIME(0 ,0), NULL);
 		/*
 		 * It is observed that with epoll_wait,
