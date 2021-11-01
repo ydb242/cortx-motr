@@ -33,8 +33,7 @@ M0_SRC_DIR=`readlink -f $0`
 M0_SRC_DIR=${M0_SRC_DIR%/*/*}
 
 . $M0_SRC_DIR/utils/functions # m0_default_xprt
-. /usr/libexec/cortx-motr/motr-service.functions
-XPRT=$(m0_get_motr_transport)
+XPRT=$(m0_default_xprt)
 
 # variables
 verbose=false
