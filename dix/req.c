@@ -1482,7 +1482,9 @@ static void dix_get_req_resend(struct m0_dix_req *req)
 		 */
 		rc = M0_ERR(-EHOSTUNREACH);
 		goto end;
-	}
+	} else
+		M0_LOG(M0_ERROR, "dix get retry :%d...", retry_count);
+
 	rc = m0_bufvec_empty_alloc(&keys, keys_nr);
 	M0_ALLOC_ARR(indices, keys_nr);
 	if (rc != 0 || indices == NULL) {

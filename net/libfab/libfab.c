@@ -397,6 +397,7 @@ static int libfab_hostname_to_ip(char *hostname , char* ip)
 		//Return the first one;
 		strcpy(ip , inet_ntoa(*addr[i]));
 		n=strlen(ip);
+		M0_LOG(M0_ERROR, "hostname %s ip %s", (char*)hostname, (char*)ip);
 		return M0_RC(n);
 	}
 
@@ -737,6 +738,7 @@ static void libfab_straddr_gen(struct m0_fab__conn_data *cd, char *buf,
 	  else if (cd->fcd_addr_frmt == FAB_NATIVE_HOSTNAME_FORMAT)
 		sprintf(buf, "%s", cd->fcd_hostname);
 
+	M0_LOG(M0_ERROR, "ip:%s port:%s hostname:%s", (char *)en->fen_addr, (char *)en->fen_port, (char *)buf);
 	M0_ASSERT(len >= strlen(buf));
 }
 
@@ -1316,6 +1318,8 @@ static int libfab_conn_accept(struct m0_fab__ep *ep, struct m0_fab__tm *tm,
 	int                       rc;
 
 	M0_ENTRY("from ep=%s -> tm = %s", (char*)ep->fep_name_p.fen_str_addr,
+		 (char*)tm->ftm_pep->fep_name_p.fen_str_addr);
+	M0_LOG(M0_ERROR, "from ep=%s -> tm = %s", (char*)ep->fep_name_p.fen_str_addr,
 		 (char*)tm->ftm_pep->fep_name_p.fen_str_addr);
 
 	aep = libfab_aep_get(ep);
@@ -2357,6 +2361,9 @@ static int libfab_conn_init(struct m0_fab__ep *ep, struct m0_fab__tm *ma,
 		else
 			M0_LOG(M0_DEBUG, " Conn req failed ret=%d dst=%"PRIx64,
 			       ret, dst);
+		M0_LOG(M0_ERROR, " Conn req ip:%s port:%s hostname:%s ret=%d dst=%"PRIx64,
+			       (char *)ep->fep_name_p.fen_addr, (char *)ep->fep_name_p.fen_port,
+			       (char *)ep->fep_name_p.fen_str_addr, ret, dst);
 	}
 	
 	if (ret == 0)
