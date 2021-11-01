@@ -352,8 +352,8 @@ static int initlift_get_next_floor(struct m0_client *m0c)
 static void initlift_move_next_floor(struct m0_client *m0c)
 {
 	static uint32_t       floor = 0;
-	m0time_t              start = m0_time_now();
-	m0time_t              end;
+	m0_time_t              start = m0_time_now();
+	m0_time_t              end;
 
 	M0_PRE(m0c != NULL);
 
@@ -371,7 +371,7 @@ static void initlift_move_next_floor(struct m0_client *m0c)
 			   initlift_get_next_floor(m0c));
 	
 	end = m0_time_now();
-	M0_LOG(M0_ALWAYS,"floor :%d start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64, floor++;
+	M0_LOG(M0_ALWAYS,"floor :%d start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64, floor++,
 		start, end, m0_time_sub(end, start));
 }
 
@@ -1509,8 +1509,8 @@ int m0_client_init(struct m0_client **m0c_p,
 	int               rc;
 	struct m0_client *m0c;
 	struct m0_fid     cli_svc_fid;
-	m0time_t          start = m0_time_now();
-	m0time_t          end;
+	m0_time_t          start = m0_time_now();
+	m0_time_t          end;
 
 	M0_PRE(m0c_p != NULL);
 	M0_PRE(*m0c_p == NULL);
@@ -1584,6 +1584,7 @@ int m0_client_init(struct m0_client **m0c_p,
 		start, end, m0_time_sub(end, start));
 
 	initlift_move_next_floor(m0c);
+	start = m0_time_now();
 
 	/*
 	 * If Client initialisation successes, close the configuration fs
@@ -1603,6 +1604,7 @@ int m0_client_init(struct m0_client **m0c_p,
 		ha_process_event(m0c, M0_CONF_HA_PROCESS_STARTED);
 	end = m0_time_now();
 	M0_LOG(M0_ALWAYS,"motr client init after lift start=%"PRIu64" end=%"PRIu64" diff=%"PRIu64,
+		start, end, m0_time_sub(end, start));
 		/*
 		   For m0crate, s3servers and other client apps,
 		   M0_NC_DTM_RECOVERING state is transient, sending
