@@ -53,6 +53,7 @@ m0_conf_ha_process_event_post(struct m0_ha                  *ha,
 	uint64_t          tag;
 
 	M0_ENTRY("process_fid="FID_F" event=%d", FID_P(process_fid), event);
+	M0_LOG(M0_ALWAYS, "process_fid="FID_F" event=%d", FID_P(process_fid), event);
 	M0_ALLOC_PTR(msg);
 	if (msg == NULL) {
 		M0_LOG(M0_ERROR, "can't allocate memory for msg");
