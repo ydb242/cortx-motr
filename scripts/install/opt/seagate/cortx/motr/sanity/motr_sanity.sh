@@ -31,6 +31,7 @@ M0_SRC_DIR=$(dirname $(readlink -f $0))
 M0_SRC_DIR="$M0_SRC_DIR/../../../../../../../"
 
 . $M0_SRC_DIR/utils/functions # m0_local_nid_get
+. /usr/libexec/cortx-motr/motr-service.functions
 
 conf="/etc/motr/conf.xc"
 user_config=/etc/sysconfig/motr
@@ -130,7 +131,7 @@ stop_singlenode()
 
 ip_generate()
 {
-	IP=$(m0_local_nid_get)
+	IP=$(m0_get_lnet_nid)
 
 	if [[ ! ${IP} ]]; then
 		(>&2 echo 'error! m0singlenode not running.')
