@@ -387,9 +387,10 @@ static int libfab_hostname_to_ip(char *hostname , char* ip)
 	n = cp - hostname;
 	memcpy(name, hostname, n);
 	name[n] = '\0';
-	M0_LOG(M0_DEBUG, "in %s out %s", (char*)hostname, (char*)name);
-	if ((hname = gethostbyname(name)) == NULL)
-		return M0_ERR(-EPROTO);
+	M0_LOG(M0_ALWAYS, "in %s out %s", (char*)hostname, (char*)name);
+	if ((hname = gethostbyname(name)) == NULL) {
+		return M0_ERR(h_errno);
+	}
 
 	addr = (struct in_addr **) hname->h_addr_list;
 	for(i = 0; addr[i] != NULL; i++)
