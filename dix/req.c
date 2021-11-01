@@ -1468,12 +1468,14 @@ static void dix_get_req_resend(struct m0_dix_req *req)
 	uint32_t          i;
 	uint32_t          k = 0;
 	int               rc;
+	static uint32_t   retry_count = 0;
+
 	M0_ENTRY();
 
 	keys_nr = m0_count(i, req->dr_items_nr,
 			dix_item_get_has_failed(&req->dr_items[i]) &&
 			!dix_item_parity_unit_is_last(req, &req->dr_items[i]));
-	if (keys_nr == 0) {
+        if (keys_nr == 0 && retry_count++ > 100 ) {
 		/*
 		 * Some records are not retrieved from both data and parity
 		 * units locations.
