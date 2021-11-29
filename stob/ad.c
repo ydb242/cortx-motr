@@ -1180,7 +1180,7 @@ static void stob_ad_write_credit(const struct m0_stob_domain *dom,
 	 * on assumption that that adom->sad_overwrite will be always false,
 	 * Now we have set it to True by default to fix EOS-25302 hence
 	 * disabling it with "#if 0"
-	 * TODO: Probably sad_overwrite is introduce for COW(Copy on Write) and
+	 * TODO: Probably sad_overwrite is introduced for COW(Copy on Write) and
 	 * for Object versioning in Motr, which is not implemented yet. Need to
 	 * revisit this part while implementing COW and object versioning.
 	 */
