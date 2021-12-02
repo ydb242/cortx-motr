@@ -878,6 +878,10 @@ static void libfab_txep_event_check(struct m0_fab__ep *txep,
 							 FAB_CONNLINK_TXEP_RDY |
 							 FAB_CONNLINK_RXEP_RDY;
 			} else if (event == FI_SHUTDOWN) {
+				/* Flush all events from rxep EQ. */
+				while (libfab_check_for_event(
+							aep->aep_rx_res.frr_eq,
+							&event) != -EAGAIN);
 				/* Reset and reopen endpoint */
 				libfab_txep_init(aep, tm, txep);
 			}
