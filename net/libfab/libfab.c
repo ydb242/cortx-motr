@@ -3176,8 +3176,13 @@ static int libfab_ma_init(struct m0_net_transfer_mc *ntm)
 		ftm->ftm_ntm = ntm;
 		ftm->ftm_fids.ftf_cnt = 0;
 		M0_ALLOC_ARR(ftm->ftm_fids.ftf_head, FAB_TM_FID_MALLOC_STEP);
-		if (ftm->ftm_fids.ftf_head == NULL)
+		M0_ALLOC_ARR(ftm->ftm_fids.ftf_ctx, FAB_TM_FID_MALLOC_STEP);
+		if (ftm->ftm_fids.ftf_head == NULL ||
+		    ftm->ftm_fids.ftf_ctx == NULL) {
+			m0_free(ftm->ftm_fids.ftf_head);
+			m0_free(ftm->ftm_fids.ftf_ctx);
 			return M0_ERR(-ENOMEM);
+		}
 		ftm->ftm_fids.ftf_arr_size = FAB_TM_FID_MALLOC_STEP;
 		fab_buf_tlist_init(&ftm->ftm_done);
 		fab_bulk_tlist_init(&ftm->ftm_bulk);
