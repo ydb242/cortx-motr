@@ -48,7 +48,6 @@ class Cmd:
         configure_machine_id(self, None)
 
         if self._index:
-            self.k8 = Conf.get(self._index, 'cortx>common>environment_type')
             self.k8 = Conf.get(self._index, 'cortx>common>setup_type')
         if self.k8 != "K8":
             self.logfile = LOGFILE
@@ -78,7 +77,7 @@ class Cmd:
             self.cluster = get_value(self, 'cluster', dict)
             self.nodes = get_value(self, 'node', dict)
             self.node = get_server_node(self, True)
-            if self.node['type'] == 'data_node' or self.node['type'] == 'server_node':
+            if self.node['type'] == 'data_node':
                 self.storage = get_storage(self)
             Conf.load(self._index_motr_hare, self._url_motr_hare)
     @property
