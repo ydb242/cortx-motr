@@ -48,7 +48,7 @@ enum {
 	/** Default number of threads to create in a storage object domain. */
 	M0_STOB_IOQ_NR_THREADS     = 8,
 	/** Default size of a ring buffer shared by adieu and the kernel. */
-	M0_STOB_IOQ_RING_SIZE      = 1024,
+	M0_STOB_IOQ_RING_SIZE      = 128,
 	/** Size of a batch in which requests are moved from the admission queue
 	    to the ring buffer. */
 	M0_STOB_IOQ_BATCH_IN_SIZE  = 8,
