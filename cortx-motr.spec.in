@@ -114,8 +114,6 @@ BuildRequires:  kernel-devel = %{kernel_ver_requires}
 BuildRequires:  %{lustre_devel}
 %endif
 BuildRequires:  libuuid-devel
-BuildRequires:  openssl
-BuildRequires:  openssl-devel
 BuildRequires:  binutils-devel
 %if %{rhel} < 8
 BuildRequires:  python36-ply
@@ -143,8 +141,6 @@ Requires:       %{lustre}
 %endif
 Requires:       libaio
 Requires:       libyaml
-#Supported openssl versions -- CentOS 7 its 1.0.2k, RHEL8 its 1.1.1
-Requires:       openssl
 Requires:       gdb
 Requires:       genders
 %if %{rhel} < 8
