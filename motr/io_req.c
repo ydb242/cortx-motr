@@ -1325,7 +1325,8 @@ static int ioreq_application_data_copy(struct m0_op_io *ioo,
 		 * skip checksum verification during degraded I/O
 		 */
 		if (ioreq_sm_state(ioo) != IRS_DEGRADED_READING &&
-		    ioo->ioo_attr.ov_vec.v_nr &&
+		    ioo->ioo_attr.ov_vec.v_nr != 0 && !ioo->ioo_dgmode_io_sent &&
+		    !is_parity_verify_mode(m0__op_instance(&ioo->ioo_oo.oo_oc.oc_op)) &&
 		    !verify_checksum(ioo)) {
 			return M0_RC(-EIO);
 		}
