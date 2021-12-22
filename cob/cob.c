@@ -353,6 +353,72 @@ static const struct m0_be_btree_kv_ops cob_ns_ops = {
 };
 
 /**
+   Make bytecount key for iterator. Allocate space for maximal possible name.
+*/
+static int m0_cob_max_bckey_make(struct m0_cob_bckey **keyh,
+				 const struct m0_fid  *pver_fid,
+				 uint64_t              user_id)
+{
+	struct m0_cob_bckey *key;
+
+	key = m0_alloc(sizeof *key + M0_COB_NAME_MAX);
+	if (key == NULL)
+		return M0_ERR(-ENOMEM);
+	key->cbk_pfid = *pver_fid;
+	key->cbk_user_id = user_id;
+	*keyh = key;
+	return 0;
+}
+
+M0_INTERNAL int m0_cob_bckey_cmp(const struct m0_cob_bckey *k0,
+				 const struct m0_cob_bckey *k1)
+{
+	int rc;
+
+	M0_PRE(m0_fid_is_set(&k0->cbk_pver_fid));
+	M0_PRE(m0_fid_is_set(&k1->cbk_pver_fid));
+
+	rc = m0_fid_cmp(&k0->cnk_pfid, &k1->cnk_pfid);
+	return rc ?: k0->cbk_user_id == k1->cbk_user_id;
+}
+
+/**
+   Key size for iterator in which case we don't know exact length of key
+   and want to allocate it for worst case scenario, that is, for max
+   possible name len.
+ */
+static size_t m0_cob_max_bckey_size(void)
+{
+	return sizeof(struct m0_cob_bckey) + M0_COB_NAME_MAX;
+}
+
+/**
+   Bytecount table comparator.
+*/
+static int bc_cmp(const void *key0, const void *key1)
+{
+	return m0_cob_bckey_cmp((const struct m0_cob_bckey *)key0,
+				(const struct m0_cob_bckey *)key1);
+}
+
+static m0_bcount_t bc_ksize(const void *key)
+{
+	return m0_cob_bckey_size(key);
+}
+
+static m0_bcount_t bc_vsize(const void *val)
+{
+	return sizeof(struct m0_cob_bcrec);
+}
+
+static const struct m0_be_btree_kv_ops cob_bc_ops = {
+	.ko_type    = M0_BBT_COB_BYTECOUNT,
+	.ko_ksize   = bc_ksize,
+	.ko_vsize   = bc_vsize,
+	.ko_compare = bc_cmp
+};
+
+/**
    Object index table definition.
 */
 static int oi_cmp(const void *key0, const void *key1)
@@ -488,6 +554,7 @@ int m0_cob_domain_init(struct m0_cob_domain *dom, struct m0_be_seg *seg)
 	m0_be_btree_init(&dom->cd_fileattr_basic, seg, &cob_fab_ops);
 	m0_be_btree_init(&dom->cd_fileattr_omg,   seg, &cob_omg_ops);
 	m0_be_btree_init(&dom->cd_fileattr_ea,    seg, &cob_ea_ops);
+	m0_be_btree_init(&dom->cd_bytecount,      seg, &cob_bc_ops);
 
 	return M0_RC(0);
 }
@@ -499,6 +566,7 @@ void m0_cob_domain_fini(struct m0_cob_domain *dom)
 	m0_be_btree_fini(&dom->cd_fileattr_basic);
 	m0_be_btree_fini(&dom->cd_object_index);
 	m0_be_btree_fini(&dom->cd_namespace);
+	m0_be_btree_fini(&dom->cd_bytecount);
 }
 
 static void cob_domain_id2str(char **s, const struct m0_cob_domain_id *cdid)
@@ -588,6 +656,11 @@ int m0_cob_domain_create_prepared(struct m0_cob_domain          **out,
 					 &M0_FID_TINIT('b',
 						       M0_BBT_COB_FILEATTR_EA,
 						       cdid->id)));
+	M0_BE_OP_SYNC(o,
+		      m0_be_btree_create(&dom->cd_bytecount, tx, &o,
+					 &M0_FID_TINIT('b',
+						       M0_BBT_COB_BYTECOUNT,
+						       cdid->id)));
 
 	data = M0_BUF_INIT_PTR(&dom);
 	rc = m0_be_0type_add(&m0_be_cob0, bedom, tx, cdid_str, &data);
@@ -661,6 +734,7 @@ int m0_cob_domain_destroy(struct m0_cob_domain *dom,
 	m0_be_btree_destroy_credit(&dom->cd_fileattr_basic, &cred);
 	m0_be_btree_destroy_credit(&dom->cd_fileattr_omg,   &cred);
 	m0_be_btree_destroy_credit(&dom->cd_fileattr_ea,    &cred);
+	m0_be_btree_destroy_credit(&dom->cd_bytecount,      &cred);
 
 
 	m0_be_tx_init(tx, 0, bedom, grp, NULL, NULL, NULL, NULL);
@@ -677,6 +751,7 @@ int m0_cob_domain_destroy(struct m0_cob_domain *dom,
 	M0_BE_OP_SYNC(o, m0_be_btree_destroy(&dom->cd_fileattr_basic, tx, &o));
 	M0_BE_OP_SYNC(o, m0_be_btree_destroy(&dom->cd_fileattr_omg,   tx, &o));
 	M0_BE_OP_SYNC(o, m0_be_btree_destroy(&dom->cd_fileattr_ea,    tx, &o));
+	M0_BE_OP_SYNC(o, m0_be_btree_destroy(&dom->cd_bytecount,      tx, &o));
 
 	m0_cob_domain_fini(dom);
 
@@ -876,6 +951,68 @@ M0_INTERNAL int m0_cob_alloc(struct m0_cob_domain *dom, struct m0_cob **out)
 static int cob_ns_lookup(struct m0_cob *cob);
 static int cob_oi_lookup(struct m0_cob *cob);
 static int cob_fab_lookup(struct m0_cob *cob);
+
+M0_INTERNAL int m0_cob_bc_lookup(struct m0_cob *cob, struct m0_cob_bckey *bckey)
+{
+	struct m0_buf   key;
+	struct m0_buf   val;
+	int             rc;
+
+
+	M0_PRE(bckey != NULL &&
+	       m0_fid_is_set(&bckey->cbk_pver_fid));
+
+	m0_buf_init(&key, bckey, m0_cob_bckey_size(cob->co_bckey));
+	m0_buf_init(&val, &cob->co_bcrec, sizeof cob->co_bcrec);
+
+	rc = cob_table_lookup(&cob->co_dom->cd_bytecount, &key, &val);
+	if (rc == 0) {
+		cob->co_flags |= M0_CA_BCREC;
+		M0_POST(m0_fid_is_set(m0_cob_fid(cob)));
+	}
+	return rc;
+}
+
+M0_INTERNAL int m0_cob_bc_insert(struct m0_cob *cob, struct m0_cob_bckey *bc_key,
+			         struct m0_cob_bcrec *bc_val, struct m0_be_tx *tx)
+{
+	struct m0_buf   key;
+	struct m0_buf   val;
+	int             rc;
+
+	M0_PRE(bc_key != NULL && bc_val != NULL &&
+	       m0_fid_is_set(&bc_key->cbk_pver_fid));
+
+	m0_buf_init(&key, bc_key, m0_cob_bckey_size(cob->co_bckey));
+	m0_buf_init(&val, bc_val, sizeof cob->co_bcrec);
+
+	rc = cob_table_insert(&cob->co_dom->cd_bytecount, tx, &key, &val);
+	if (rc == 0)
+		cob->co_flags |= M0_CA_BCREC;
+	return M0_RC(rc);
+}
+
+
+M0_INTERNAL int m0_cob_bc_update(struct m0_cob *cob, struct m0_cob_bckey *bc_key,
+			         struct m0_cob_bcrec *bc_val, struct m0_be_tx *tx)
+{
+	struct m0_buf   key;
+	struct m0_buf   val;
+	int             rc;
+
+	M0_PRE(bc_key != NULL && bc_val != NULL &&
+	       m0_fid_is_set(&bc_key->cbk_pver_fid));
+
+
+	m0_buf_init(&key, bc_key, m0_cob_bckey_size(cob->co_bckey));
+	m0_buf_init(&val, bc_val, sizeof cob->co_bcrec);
+
+	rc = cob_table_update(&cob->co_dom->cd_bytecount, tx, &key, &val);
+	if (rc == 0)
+		cob->co_flags |= M0_CA_BCREC;
+	return M0_RC(rc);
+}
+
 
 /**
    Search for a record in the namespace table
@@ -1913,6 +2050,7 @@ enum cob_table_kvtype {
 	COB_KVTYPE_FEA,
 	COB_KVTYPE_NS,
 	COB_KVTYPE_OI,
+	COB_KVTYPE_BC,
 };
 
 static void cob_table_tx_credit(struct m0_be_btree *tree,
@@ -1944,6 +2082,10 @@ static void cob_table_tx_credit(struct m0_be_btree *tree,
 			.s_key = sizeof(struct m0_cob_oikey),
 			.s_rec = m0_cob_max_nskey_size(),
 				     /* XXX ^^^^^ is it right? */
+		},
+		[COB_KVTYPE_BC] = {
+			.s_key = sizeof(struct m0_cob_bckey),
+			.s_rec = m0_cob_max_bckey_size(),
 		},
 	};
 	m0_bcount_t ksize;
@@ -2027,6 +2169,17 @@ M0_INTERNAL void m0_cob_tx_credit(struct m0_cob_domain *dom,
 		TCREDIT(&dom->cd_namespace, INSERT, NS, accum);
 		TCREDIT(&dom->cd_namespace, DELETE, NS, accum);
 		TCREDIT(&dom->cd_object_index, UPDATE, OI, accum);
+		break;
+	case M0_COB_OP_BYTECOUNT_SET:
+		TCREDIT(&dom->cd_bytecount, INSERT, BC, accum);
+		break;
+	case M0_COB_OP_BYTECOUNT_DEL:
+		TCREDIT(&dom->cd_bytecount, DELETE, BC, accum);
+		break;
+	case M0_COB_OP_BYTECOUNT_UPDATE:
+		TCREDIT(&dom->cd_bytecount, INSERT, BC, accum);
+		TCREDIT(&dom->cd_bytecount, DELETE, BC, accum);
+		TCREDIT(&dom->cd_bytecoubt, UPDATE, BC, accum);
 		break;
 	default:
 		M0_IMPOSSIBLE("Impossible cob optype");
