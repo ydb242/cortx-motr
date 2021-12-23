@@ -51,6 +51,7 @@ BE_SEG0_SZ = 128 * 1024 *1024 #128M
 MACHINE_ID_FILE = "/etc/machine-id"
 TEMP_FID_FILE= "/opt/seagate/cortx/motr/conf/service_fid.yaml"
 CMD_RETRY_COUNT = 5
+SMALL_ADDB_SZ = 128 * 1024 * 1024 #128M
 
 class MotrError(Exception):
     """ Generic Exception with error code and output """
@@ -345,12 +346,20 @@ def update_copy_motr_config_file(self):
     dirs = [MOTR_M0D_DATA_DIR, MOTR_M0D_ADDB_STOB_DIR, MOTR_M0D_TRACE_DIR, MOTR_M0D_CONF_DIR]
     create_dirs(self, dirs)
 
+    # Set ADDB size according to setup_size:
+    # VM=small=128M (Update it using update_config_file())
+    # HW=large=1G (Already updated using /opt/seagate/cortx/motr/libexec/motr_cfg.sh)
+    if self.setup_size == "small":
+        MOTR_MOD_ADDB_RECORD_SIZE = SMALL_ADDB_SZ
+
     # Update new config keys to config file /etc/sysconfig/motr
     config_kvs = [("MOTR_M0D_CONF_DIR", f"{MOTR_M0D_CONF_DIR}"),
                    ("MOTR_M0D_DATA_DIR", f"{MOTR_M0D_DATA_DIR}"),
                    ("MOTR_M0D_CONF_XC", f"{MOTR_M0D_CONF_XC}"),
                    ("MOTR_M0D_ADDB_STOB_DIR", f"{MOTR_M0D_ADDB_STOB_DIR}"),
-                   ("MOTR_M0D_TRACE_DIR", f"{MOTR_M0D_TRACE_DIR}")]
+                   ("MOTR_M0D_TRACE_DIR", f"{MOTR_M0D_TRACE_DIR}"),
+                   ("MOTR_MOD_ADDB_RECORD_SIZE", f"{MOTR_MOD_ADDB_RECORD_SIZE}")]
+
     update_config_file(self, f"{MOTR_SYS_CFG}", config_kvs)
 
     # Copy config file to new path
@@ -417,7 +426,12 @@ def motr_config_k8(self):
     if (self.node['type'] == 'storage_node' or self.node['type'] == 'data_node'):
         update_motr_hare_keys(self, self.nodes)
 
-    execute_command(self, MOTR_CONFIG_SCRIPT, verbose = True)
+    # If setup_size is large i.e.HW, read the (key,val)
+    # from /opt/seagate/cortx/motr/conf/motr.conf and
+    # update to /etc/sysconfig/motr
+    if self.setup_size == "large":
+        cmd = "{} {}".format(MOTR_CONFIG_SCRIPT, " -c")
+        execute_command(self, cmd, verbose = True)
 
     # Update be_seg size for storage node and data node
     if (self.node['type'] == 'storage_node' or self.node['type'] == 'data_node'):
