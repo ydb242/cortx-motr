@@ -271,7 +271,8 @@ struct m0_cob_domain {
 	struct m0_be_btree      cd_namespace;
 	struct m0_be_btree      cd_fileattr_basic;
 	struct m0_be_btree      cd_fileattr_omg;
-	struct m0_be_btree      cd_fileattr_ea;
+	struct m0_be_btree      cd_fileattr_omg;
+	struct m0_be_btree      cd_bytecount;
 } M0_XCA_RECORD M0_XCA_DOMAIN(be);
 
 enum m0_cob_domain_format_version {
@@ -517,6 +518,7 @@ struct m0_cob_bckey {
 /** Byte count table record. */
 struct m0_cob_bcrec {
 	uint64_t          cbr_bytecount;  /**< User id str? */
+	uint64_t          cbr_cob_objects;  /**< User id str? */
 } M0_XCA_RECORD M0_XCA_DOMAIN(be);
 
 /**
@@ -587,7 +589,7 @@ struct m0_cob {
 	struct m0_cob_fabrec  *co_fabrec;   /**< fileattr_basic data (acl...) */
 	struct m0_cob_omgrec   co_omgrec;   /**< permission data */
 	struct m0_cob_bckey   *co_bckey;    /**< Bytecount key */
-	struct m0_cob_bcrec   *co_bcrec;    /**< Bytecount value */
+	struct m0_cob_bcrec   *co_bcrec;    /**< Cob object count */
 };
 
 /**
