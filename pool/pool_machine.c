@@ -34,7 +34,7 @@
 #include "ioservice/fid_convert.h" /* m0_fid_convert_gob2cob */
 #include "ha/failvec.h"            /* m0_ha_failvec_fetch */
 #include "lib/finject.h"           /* M0_FI_ENABLED */
-
+#include "conf/dir.h"              /* m0_conf_dir_tl */
 /**
    @addtogroup poolmach
 
@@ -562,6 +562,9 @@ M0_INTERNAL int m0_poolmach_state_transit(struct m0_poolmach       *pm,
 	enum m0_pool_nd_state          old_state = M0_PNDS_FAILED;
 	uint32_t                       i;
 	int                            rc = 0;
+	struct m0_conf_root           *root;
+	const struct m0_conf_obj      *obj;
+	uint32_t		       fl_node = 0;
 	struct m0_poolmach_event_link *new_link;
 
 	M0_ENTRY();
@@ -783,7 +786,38 @@ M0_INTERNAL int m0_poolmach_state_transit(struct m0_poolmach       *pm,
 					event->pe_state);
 		m0_poolmach_event_list_dump_locked(pm);
 	}
-	pm->pm_pver->pv_is_dirty = state->pst_nr_failures > 0;
+
+	if (pm->pm_pver->pv_pc) {
+		rc = m0_confc_root_open(pm->pm_pver->pv_pc->pc_confc, &root);
+		if (rc == 0) {
+			if (m0_fid_eq(&pm->pm_pver->pv_id, &root->rt_imeta_pver)) {
+				/* this is index pool version. Checking for no
+				 * of failed node from the pool.
+				 */
+				M0_LOG(M0_ALWAYS, "YSM pm pver : "FID_F" imeta_pver : "FID_F,
+					FID_P(&pm->pm_pver->pv_id),
+					FID_P(&root->rt_imeta_pver));
+				m0_tl_for (m0_conf_dir, &root->rt_nodes->cd_items, obj) {
+					if (obj->co_ha_state == M0_NC_FAILED)
+						fl_node++;
+				} m0_tl_endfor;
+				/*
+				 * Check does no of failed node are greater than K
+				 * from the pool config. Ideally we should check with
+				 * encl/node level tolerance value.
+				 */
+				M0_LOG(M0_ALWAYS, "YSM fl_node : %u , pa_K : %u",
+						fl_node, pm->pm_pver->pv_attr.pa_K);
+				if (fl_node > pm->pm_pver->pv_attr.pa_K)
+					pm->pm_pver->pv_is_dirty = true;
+			} else {
+				pm->pm_pver->pv_is_dirty = state->pst_nr_failures > 0;
+			}
+			m0_confc_close(&root->rt_obj);
+		}
+	} else
+		pm->pm_pver->pv_is_dirty = state->pst_nr_failures > 0;
+
 	/* Clear any dirty sns flags set during previous repair */
 	pm->pm_pver->pv_sns_flags = state->pst_nr_failures <=
 				    state->pst_max_device_failures ?
