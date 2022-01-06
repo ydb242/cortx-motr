@@ -631,6 +631,7 @@ struct m0_client {
 
         struct m0_tl                            m0c_inflight;
 	struct m0_mutex                         m0c_inflight_lock;
+	m0_time_t                               m0c_log_start_time;
 };
 
 /** CPUs semaphore - to control CPUs usage by parity calcs. */

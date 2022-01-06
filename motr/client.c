@@ -812,12 +812,14 @@ M0_INTERNAL int m0_op_alloc(struct m0_op **op, size_t op_size)
  * pre-allocated with the wrong size. -ENOMEM if it was not possible to
  * allocate memory for the operation.
  */
+#define LOG_OP_INFLIGHT_INTRVL 300
 M0_INTERNAL int m0_op_init(struct m0_op *op,
 			   const struct m0_sm_conf *conf,
 			   struct m0_entity *entity)
 {
 	struct m0_sm_group *grp;
 	struct m0_client   *cinst;
+	m0_time_t           time_now;
 
 	M0_ENTRY();
 
@@ -852,11 +854,16 @@ M0_INTERNAL int m0_op_init(struct m0_op *op,
 	m0_sm_group_unlock(grp);
 	m0_mutex_init(&op->op_priv_lock);
 	if (entity != NULL) {
+		time_now = m0_time_now();
 		cinst = m0__entity_instance(entity);
 		op_inflight_tlink_init(op);
 		m0_mutex_lock(&cinst->m0c_inflight_lock);
 		op_inflight_tlist_add(&cinst->m0c_inflight, op);
 		m0_mutex_unlock(&cinst->m0c_inflight_lock);
+		if (m0_time_sub(time_now, cinst->m0c_log_start_time) > m0_time(LOG_OP_INFLIGHT_INTRVL, 0)) {
+			M0_LOG(M0_ALWAYS, "number of op_inflight = %d", (int)op_inflight_tlist_length(&cinst->m0c_inflight));
+			cinst->m0c_log_start_time = time_now;
+		}
 	}
 
 	return M0_RC(0);
