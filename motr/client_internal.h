@@ -628,6 +628,9 @@ struct m0_client {
 	struct m0_dtm0_service                 *m0c_dtms;
 
 	struct m0_dtm0_domain                   m0c_dtm0_domain;
+
+        struct m0_tl                            m0c_inflight;
+	struct m0_mutex                         m0c_inflight_lock;
 };
 
 /** CPUs semaphore - to control CPUs usage by parity calcs. */

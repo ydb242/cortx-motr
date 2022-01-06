@@ -685,6 +685,8 @@ struct m0_op {
 	 */
 	void                          *op_priv;
 	struct m0_mutex                op_priv_lock;
+	struct m0_tlink                op_inflight_tlink;
+	uint64_t                       op_inflight_magic;
 };
 
 /**
@@ -699,6 +701,10 @@ enum m0_op_state {
 	M0_OS_FAILED,
 	M0_OS_NR
 };
+
+/** clovis operation in flight list declaration*/
+M0_TL_DESCR_DECLARE(op_inflight, M0_EXTERN);
+M0_TL_DECLARE(op_inflight, M0_INTERNAL, struct m0_op);
 
 /**
  * Common structure shared by objects, indices and realms.

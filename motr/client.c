@@ -92,6 +92,15 @@ M0_EXPORTED(M0_UBER_REALM);
 const struct m0_uint128 M0_ID_APP = { 0ULL, 0x100000ULL };
 M0_EXPORTED(M0_ID_APP);
 
+/** clovis infligt operation list */
+M0_TL_DESCR_DEFINE(op_inflight, "m0_op pending list", M0_INTERNAL,
+                        struct m0_op,
+                        op_inflight_tlink, op_inflight_magic,
+                        M0_OP_MAGIC,
+                        M0_OP_MAGIC);
+
+M0_TL_DEFINE(op_inflight, M0_INTERNAL, struct m0_op);
+
 enum { MAX_OPCODE = 256 };
 static uint64_t opcount[MAX_OPCODE];
 
@@ -808,6 +817,7 @@ M0_INTERNAL int m0_op_init(struct m0_op *op,
 			   struct m0_entity *entity)
 {
 	struct m0_sm_group *grp;
+	struct m0_client   *cinst;
 
 	M0_ENTRY();
 
@@ -819,6 +829,7 @@ M0_INTERNAL int m0_op_init(struct m0_op *op,
 	M0_PRE(m0_sm_conf_is_initialized(conf));
 	M0_ASSERT(ergo(entity != NULL, entity_invariant_full(entity)));
 
+	cinst = m0__entity_instance(entity);
 	/* Initialise the operation. */
 	m0_op_bob_init(op);
 	op->op_entity = entity;
@@ -840,6 +851,13 @@ M0_INTERNAL int m0_op_init(struct m0_op *op,
 	M0_POST(m0_sm_invariant(&op->op_sm));
 	m0_sm_group_unlock(grp);
 	m0_mutex_init(&op->op_priv_lock);
+	if (entity != NULL) {
+		cinst = m0__entity_instance(entity);
+		op_inflight_tlink_init(op);
+		m0_mutex_lock(&cinst->m0c_inflight_lock);
+		op_inflight_tlist_add(&cinst->m0c_inflight, op);
+		m0_mutex_unlock(&cinst->m0c_inflight_lock);
+	}
 
 	return M0_RC(0);
 }
@@ -848,6 +866,7 @@ void m0_op_fini(struct m0_op *op)
 {
 	struct m0_op_common        *oc;
 	struct m0_sm_group         *grp;
+	struct m0_client           *cinst;
 
 	M0_ENTRY();
 
@@ -857,6 +876,7 @@ void m0_op_fini(struct m0_op *op)
 					  M0_OS_FAILED)));
 	M0_PRE(op->op_size >= sizeof *oc);
 
+	cinst = m0__entity_instance(op->op_entity);
 	oc = bob_of(op, struct m0_op_common, oc_op, &oc_bobtype);
 	if (oc->oc_cb_fini != NULL)
 		oc->oc_cb_fini(oc);
@@ -868,6 +888,10 @@ void m0_op_fini(struct m0_op *op)
 	op->op_sm.sm_state = M0_OS_UNINITIALISED;
 	m0_sm_group_unlock(grp);
 	m0_sm_group_fini(grp);
+
+	m0_mutex_lock(&cinst->m0c_inflight_lock);
+        op_inflight_tlist_del(op);
+	m0_mutex_unlock(&cinst->m0c_inflight_lock);
 
 	/* Finalise op's bob */
 	m0_op_bob_fini(op);

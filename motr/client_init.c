@@ -1693,6 +1693,10 @@ int m0_client_init(struct m0_client **m0c_p,
 		rc = m0_reqh_addb2_init(&m0c->m0c_reqh, buf,
 					0xaddbf11e, true, true, size);
 	}
+
+	m0_mutex_init(&m0c->m0c_inflight_lock);
+        op_inflight_tlist_init(&m0c->m0c_inflight);
+
 	/* publish the allocated client instance */
 	*m0c_p = m0c;
 	return M0_RC(rc);
@@ -1724,6 +1728,9 @@ void m0_client_fini(struct m0_client *m0c, bool fini_m0)
 		m0_addb2_force_all();
 		m0_reqh_addb2_fini(&m0c->m0c_reqh);
 	}
+
+        m0_mutex_fini(&m0c->m0c_inflight_lock);
+        op_inflight_tlist_fini(&m0c->m0c_inflight);
 
 	/* Finalize hash-table for RM contexts */
 	rm_ctx_htable_fini(&m0c->m0c_rm_ctxs);
