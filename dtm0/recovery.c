@@ -2014,7 +2014,6 @@ static void default_ha_event_post(struct m0_dtm0_recovery_machine *m,
 
 	if (ALL2ALL) {
 		M0_LOG(M0_DEBUG, "ALL2ALL_DTM_RECOVERED");
-		return;
 	}
 
 	M0_ASSERT_INFO(m->rm_local_rfom != NULL,
