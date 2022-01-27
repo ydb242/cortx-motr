@@ -8491,6 +8491,7 @@ M0_INTERNAL int64_t m0_btree_lrulist_purge(int64_t size)
 M0_INTERNAL int64_t m0_btree_lrulist_purge_check(enum m0_btree_purge_user user,
 						 int64_t size)
 {
+#if 0
 	int64_t size_to_purge;
 	int64_t purged_size = 0;
 
@@ -8533,6 +8534,8 @@ M0_INTERNAL int64_t m0_btree_lrulist_purge_check(enum m0_btree_purge_user user,
 	       "%"PRIu64, user == M0_PU_BTREE ? "btree" : "external", size,
 	       lru_space_used, purged_size);
 	return purged_size;
+#endif
+	return 0;
 }
 #endif
 
