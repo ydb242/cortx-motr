@@ -622,7 +622,7 @@ enum {
 enum {
 	MAX_NODE_SIZE            = 10, /*node size is a power-of-2 this value.*/
 	MIN_KEY_SIZE             = 8,
-	MAX_KEY_SIZE             = 32,
+	MAX_KEY_SIZE             = 128,
 	MIN_VAL_SIZE             = 8,
 	MAX_VAL_SIZE             = 48,
 	MAX_TRIALS               = 3,
@@ -1424,9 +1424,9 @@ static int64_t lru_space_used = 0;
 
 /** Lru used space watermark default values. */
 enum lru_used_space_watermark{
-	LUSW_LOW    = 2 * 1024 * 1024 * 1024ULL,
-	LUSW_TARGET = 3 * 1024 * 1024 * 1024ULL,
-	LUSW_HIGH   = 4 * 1024 * 1024 * 1024ULL,
+	LUSW_LOW    = 6 * 1024 * 1024ULL,
+	LUSW_TARGET = 9 * 1024 * 1024ULL,
+	LUSW_HIGH   = 12 * 1024 * 1024ULL,
 };
 
 /**
@@ -8528,7 +8528,7 @@ M0_INTERNAL int64_t m0_btree_lrulist_purge_check(enum m0_btree_purge_user user,
 				(lru_space_used - lru_space_wm_target) :
 				min64(lru_space_used - lru_space_wm_low, size);
 	purged_size = m0_btree_lrulist_purge(size_to_purge);
-	M0_LOG(M0_INFO, " Above critical purge, User=%s requested size="
+	M0_LOG(M0_ERROR, " Above critical purge, User=%s requested size="
 	       "%"PRId64" used space=%"PRIu64" purged size="
 	       "%"PRIu64, user == M0_PU_BTREE ? "btree" : "external", size,
 	       lru_space_used, purged_size);
