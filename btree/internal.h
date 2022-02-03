@@ -36,6 +36,59 @@
 enum m0_btree_opcode;
 struct m0_btree_oimpl;
 
+
+struct stats_put_data {
+	uint64_t INIT_dur;
+	uint64_t SETUP_dur;
+	uint64_t DOWN_dur;
+	uint64_t NEXTDOWN_dur;
+	uint64_t NEXTDOWN_iter_count;
+	uint64_t ALLOC_REQUIRE_dur;
+	uint64_t ALLOC_REQUIRE_iter_count;
+	uint64_t ALLOC_STORE_dur;
+	uint64_t LOCK_dur;
+	uint64_t CHECK_dur;
+	uint64_t SANITY_dur;
+	uint64_t MAKESPACE_dur;
+	uint64_t ACT_dur;
+	uint64_t CAPTURE_dur;
+	uint64_t CLEANUP_dur;
+};
+
+struct stats_get_data {
+	uint64_t INIT_dur;
+	uint64_t SETUP_dur;
+	uint64_t DOWN_dur;
+	uint64_t NEXTDOWN_dur;
+	uint64_t NEXTDOWN_iter_count;
+	uint64_t LOCK_dur;
+	uint64_t CHECK_dur;
+	uint64_t ACT_dur;
+	uint64_t CLEANUP_dur;
+};
+
+struct stats_del_data {
+	uint64_t INIT_dur;
+	uint64_t SETUP_dur;
+	uint64_t DOWN_dur;
+	uint64_t NEXTDOWN_dur;
+	uint64_t NEXTDOWN_iter_count;
+	uint64_t STORE_CHILD_dur;
+	uint64_t LOCK_dur;
+	uint64_t CHECK_dur;
+	uint64_t ACT_dur;
+	uint64_t CAPTURE_dur;
+	uint64_t FREENODE_dur;
+	uint64_t FREENODE_iter_count;
+	uint64_t CLEANUP_dur;
+};
+
+union stats_ext_data {
+	struct stats_put_data put_stats;
+	struct stats_get_data get_stats;
+	struct stats_del_data del_stats;
+};
+
 struct m0_btree_op {
 	struct m0_sm_op             bo_op;
 	struct m0_sm_group          bo_sm_group;
@@ -51,6 +104,8 @@ struct m0_btree_op {
 	struct m0_btree_oimpl      *bo_i;
 	struct m0_btree_idata       bo_data;
 	struct m0_btree_rec_key_op  bo_keycmp;
+
+	union stats_ext_data all_data;
 };
 
 enum m0_btree_node_format_version {
