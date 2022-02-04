@@ -8586,7 +8586,7 @@ M0_INTERNAL int64_t m0_btree_lrulist_purge_check(enum m0_btree_purge_user user,
 				(lru_space_used - lru_space_wm_target) :
 				min64(lru_space_used - lru_space_wm_low, size);
 	purged_size = m0_btree_lrulist_purge(size_to_purge);
-	M0_LOG(M0_INFO, " Above critical purge, User=%s requested size="
+	M0_LOG(M0_ALWAYS, " Above critical purge, User=%s requested size="
 	       "%"PRId64" used space=%"PRIu64" purged size="
 	       "%"PRIu64, user == M0_PU_BTREE ? "btree" : "external", size,
 	       lru_space_used, purged_size);
