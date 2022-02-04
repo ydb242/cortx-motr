@@ -1435,9 +1435,9 @@ static int64_t lru_space_used = 0;
 
 /** Lru used space watermark default values. */
 enum lru_used_space_watermark{
-	LUSW_LOW    = 2 * 1024 * 1024 * 1024ULL,
-	LUSW_TARGET = 3 * 1024 * 1024 * 1024ULL,
-	LUSW_HIGH   = 4 * 1024 * 1024 * 1024ULL,
+	LUSW_LOW    = 6 * 1024 * 1024ULL,
+	LUSW_TARGET = 9 * 1024 * 1024ULL,
+	LUSW_HIGH   = 100 * 1024 * 1024ULL,
 };
 
 /**
