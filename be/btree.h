@@ -33,6 +33,7 @@
 #include "lib/cookie_xc.h"      /* m0_xcode_type */
 #include "fid/fid.h" /* m0_fid */
 #include "fid/fid_xc.h" /* m0_fid_xc */
+#include "btree/btree.h"
 
 /**
  * @defgroup be Meta-data back-end
@@ -586,6 +587,7 @@ struct m0_be_btree_cursor {
 	struct m0_be_bnode                   *bc_node;
 	struct m0_be_btree_cursor_stack_entry bc_stack[BTREE_HEIGHT_MAX];
 	struct m0_be_op                       bc_op; /* XXX DELETEME */
+	void                                 *all_data;
 };
 
 /**

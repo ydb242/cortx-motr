@@ -36,7 +36,6 @@
 enum m0_btree_opcode;
 struct m0_btree_oimpl;
 
-
 struct stats_put_data {
 	uint64_t INIT_dur;
 	uint64_t SETUP_dur;
@@ -89,6 +88,7 @@ union stats_ext_data {
 	struct stats_del_data del_stats;
 };
 
+
 struct m0_btree_op {
 	struct m0_sm_op             bo_op;
 	struct m0_sm_group          bo_sm_group;
@@ -105,8 +105,44 @@ struct m0_btree_op {
 	struct m0_btree_idata       bo_data;
 	struct m0_btree_rec_key_op  bo_keycmp;
 
-	union stats_ext_data all_data;
+	void                       *all_data;
 };
+
+struct btree_stats {
+	uint64_t min_dur;
+	uint64_t max_dur;
+	uint64_t avg_dur;
+	uint64_t tot_dur;
+	uint64_t sample_count;
+
+	union stats_ext_data min_data;
+
+	union stats_ext_data max_data;
+};
+
+#define RECORD_START_TIME(startTime) startTime = m0_time_now()
+#define RECORD_END_TIME(endTime)     endTime = m0_time_now()
+#define UPDATE_STATS(stats, startTime,  endTime, details)                      \
+		{                                                              \
+			uint64_t duration = endTime - startTime;               \
+			if (stats.min_dur > duration) {                        \
+				stats.min_dur = duration;                      \
+				stats.min_data = details;                      \
+			}                                                      \
+			if (stats.max_dur < duration) {                        \
+				stats.max_dur = duration;                      \
+				stats.max_data = details;                      \
+			}                                                      \
+			stats.sample_count++;                                  \
+			stats.tot_dur += duration;                             \
+			stats.avg_dur = stats.tot_dur / stats.sample_count;    \
+		}
+
+#ifndef __KERNEL__
+extern struct btree_stats get_records;
+extern struct btree_stats put_records;
+extern struct btree_stats del_records;
+#endif
 
 enum m0_btree_node_format_version {
 	M0_BTREE_NODE_FORMAT_VERSION_1 = 1,

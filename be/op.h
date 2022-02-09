@@ -100,6 +100,8 @@ struct m0_be_op {
 			struct m0_buf              t_out_key;
 			struct m0_be_btree_anchor *t_anchor;
 			int                        t_rc;
+
+			void                      *all_data;
 		} u_btree;
 
 		struct {

@@ -1105,10 +1105,18 @@ be_btree_get_btree_node(struct m0_be_btree_cursor *it, const void *key, bool sla
 	struct m0_be_btree 	*tree = it->bc_tree;
 	struct m0_be_bnode 	*bnode = tree->bb_root;
 	struct btree_node_pos    bnode_pos = { .bnp_node = NULL };
+	union stats_ext_data   *all_data = (union stats_ext_data *)it->all_data;
+	uint64_t               startTime;
+	uint64_t               endTime;
+	bool                   at_root = true;
 
 	it->bc_stack_pos = 0;
 
 	while (true) {
+		RECORD_START_TIME(startTime);
+		if (!at_root) {
+			all_data->get_stats.NEXTDOWN_iter_count++;
+		}
 		/*  Retrieve index of the key equal to or greater than */
 		/*  the key being searched */
 		idx = 0;
@@ -1122,6 +1130,13 @@ be_btree_get_btree_node(struct m0_be_btree_cursor *it, const void *key, bool sla
 		    key_eq(tree, key, bnode->bt_kv_arr[idx].btree_key)) {
 			bnode_pos.bnp_node = bnode;
 			bnode_pos.bnp_index = idx;
+			RECORD_END_TIME(endTime);
+			if (all_data) {
+				if (at_root)
+					all_data->get_stats.DOWN_dur = endTime - startTime;
+				else
+					all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+			}
 			break;
 		}
 
@@ -1138,6 +1153,14 @@ be_btree_get_btree_node(struct m0_be_btree_cursor *it, const void *key, bool sla
 		/*  Move to a child node */
 		node_push(it, bnode, idx);
 		bnode = bnode->bt_child_arr[idx];
+		RECORD_END_TIME(endTime);
+		if (all_data) {
+			if (at_root) {
+				all_data->get_stats.DOWN_dur = endTime - startTime;
+				at_root = false;
+			} else
+				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+		}
 	}
 	return bnode_pos;
 }
@@ -1295,7 +1318,7 @@ static void btree_truncate(struct m0_be_btree *btree, struct m0_be_tx *tx,
 static struct be_btree_key_val *be_btree_search(struct m0_be_btree *btree,
 						void *key)
 {
-	struct m0_be_btree_cursor btree_cursor;
+	struct m0_be_btree_cursor btree_cursor = {};
 	struct btree_node_pos	  node_pos;
 	struct be_btree_key_val   *key_val = NULL;
 
@@ -1794,7 +1817,7 @@ M0_INTERNAL void m0_be_btree_create_credit(const struct m0_be_btree     *tree,
 static int btree_count_items(struct m0_be_btree *tree, m0_bcount_t *ksize,
 			     m0_bcount_t *vsize)
 {
-	struct m0_be_btree_cursor cur;
+	struct m0_be_btree_cursor cur = {};
 	struct m0_be_op          *op = &cur.bc_op;
 	struct m0_buf             start;
 	int                       count = 0;
@@ -1982,36 +2005,52 @@ M0_INTERNAL void m0_be_btree_delete(struct m0_be_btree *tree,
 	M0_LEAVE("tree=%p", tree);
 }
 
+
 static void be_btree_lookup(struct m0_be_btree *tree,
 			    struct m0_be_op *op,
 			    const struct m0_buf *key_in,
 			    struct m0_buf *key_out,
 			    struct m0_buf *value)
 {
-	struct m0_be_btree_cursor  it;
+	struct m0_be_btree_cursor  it = {};
 	struct btree_node_pos      kp;
 	struct be_btree_key_val   *kv;
 	m0_bcount_t                ksize;
 	m0_bcount_t                vsize;
+	union stats_ext_data     *all_data = (union stats_ext_data *)op->bo_u.u_btree.all_data;
+	uint64_t               startTime;
+	uint64_t               endTime;
 
 	M0_ENTRY("tree=%p key_in=%p key_out=%p value=%p",
 		 tree, key_in, key_out, value);
 	M0_PRE(tree->bb_root != NULL && tree->bb_ops != NULL);
 
+	RECORD_START_TIME(startTime);
 	btree_op_fill(op, tree, NULL, M0_BBO_LOOKUP, NULL);
 
 	m0_be_op_active(op);
+	RECORD_END_TIME(endTime);
+	if (all_data)
+		all_data->get_stats.INIT_dur = endTime - startTime;
+
+	RECORD_START_TIME(startTime);
 	m0_rwlock_read_lock(btree_rwlock(tree));
+	RECORD_END_TIME(endTime);
+	if (all_data)
+		all_data->get_stats.LOCK_dur = endTime - startTime;
 
 	it.bc_tree = tree;
+	it.all_data = all_data;
 	kp = be_btree_get_btree_node(&it, key_in->b_addr,
 			    /* slant: */ key_out == NULL ? false : true);
+	RECORD_START_TIME(startTime);
 	if (kp.bnp_node) {
 		kv = &kp.bnp_node->bt_kv_arr[kp.bnp_index];
 
 		vsize = be_btree_vsize(tree, kv->btree_val);
 		if (vsize < value->b_nob)
 			value->b_nob = vsize;
+
 		/* XXX handle vsize > value->b_nob */
 		memcpy(value->b_addr, kv->btree_val, value->b_nob);
 
@@ -2019,14 +2058,23 @@ static void be_btree_lookup(struct m0_be_btree *tree,
 			ksize = be_btree_ksize(tree, kv->btree_key);
 			if (ksize < key_out->b_nob)
 				key_out->b_nob = ksize;
+
 			memcpy(key_out->b_addr, kv->btree_key, key_out->b_nob);
 		}
+
 		op_tree(op)->t_rc = 0;
 	} else
 		op_tree(op)->t_rc = -ENOENT;
 
 	m0_rwlock_read_unlock(btree_rwlock(tree));
+	RECORD_END_TIME(endTime);
+	if (all_data)
+		all_data->get_stats.ACT_dur = endTime - startTime;
+	RECORD_START_TIME(startTime);
 	m0_be_op_done(op);
+	RECORD_END_TIME(endTime);
+	if (all_data)
+		all_data->get_stats.CLEANUP_dur = endTime - startTime;
 	M0_LEAVE("rc=%d", op_tree(op)->t_rc);
 }
 
