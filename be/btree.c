@@ -1108,6 +1108,9 @@ be_btree_get_btree_node(struct m0_be_btree_cursor *it, const void *key, bool sla
 	union stats_ext_data   *all_data = (union stats_ext_data *)it->all_data;
 	uint64_t               startTime;
 	uint64_t               endTime;
+	uint64_t               startTime_nxt;
+	uint64_t               endTime_nxt;
+	volatile uint64_t      isleaf;
 	bool                   at_root = true;
 
 	it->bc_stack_pos = 0;
@@ -1120,11 +1123,16 @@ be_btree_get_btree_node(struct m0_be_btree_cursor *it, const void *key, bool sla
 		/*  Retrieve index of the key equal to or greater than */
 		/*  the key being searched */
 		idx = 0;
+		RECORD_START_TIME(startTime_nxt);
 		while (idx < bnode->bt_num_active_key &&
 		       key_gt(tree, key, bnode->bt_kv_arr[idx].btree_key)) {
 			idx++;
 		}
-
+		RECORD_END_TIME(endTime_nxt);
+		if (all_data) {
+			all_data->get_stats.bfind_dur += endTime_nxt-startTime_nxt;
+			all_data->get_stats.bfind_count++;
+		}
 		/*  If key is found, copy key-value pair */
 		if (idx < bnode->bt_num_active_key &&
 		    key_eq(tree, key, bnode->bt_kv_arr[idx].btree_key)) {
@@ -1153,7 +1161,14 @@ be_btree_get_btree_node(struct m0_be_btree_cursor *it, const void *key, bool sla
 		/*  Move to a child node */
 		node_push(it, bnode, idx);
 		bnode = bnode->bt_child_arr[idx];
+		RECORD_START_TIME(startTime_nxt);
+		isleaf = bnode->bt_isleaf;
 		RECORD_END_TIME(endTime);
+		if (all_data) {
+			all_data->get_stats.bget_dur += endTime-startTime_nxt;
+			all_data->get_stats.bget_count++;
+		}
+		M0_LOG( M0_INFO, "is leaf:%"PRIu64, isleaf);
 		if (all_data) {
 			if (at_root) {
 				all_data->get_stats.DOWN_dur = endTime - startTime;

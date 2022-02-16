@@ -5508,6 +5508,9 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 			PRIu64"\n",                                            \
 			p->SANITY_dur, p->MAKESPACE_dur, p->ACT_dur,           \
 			p->CAPTURE_dur, p->CLEANUP_dur);                       \
+		M0_LOG( M0_INFO, "  AVERAGE VALUES: NEXTDOWN =%"PRIu64 ";      \
+			 ACT = %"PRIu64 "\n",                                  \
+			stats.nxt_dwn_avg, stats.act_avg);                     \
 	} while (0)
 
 #define PRINT_STATS_FOR_GET(operation, stats)                                  \
@@ -5519,6 +5522,14 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 			"; NEXTDOWN = %"PRIu64"\n",                            \
 			p->INIT_dur, p->SETUP_dur, p->DOWN_dur,                \
 			p->NEXTDOWN_iter_count,p->NEXTDOWN_dur);               \
+		M0_LOG( M0_INFO, " MIN VALUES NEXTDOWN Phases : Lock  duration \
+			 = %"PRIu64" count = %"PRIu64"; Isvalid duration       \
+			 = %"PRIu64" count = %"PRIu64"; Find  duration         \
+			 = %"PRIu64" count = %"PRIu64"; Get duration           \
+			 = %"PRIu64" count = %"PRIu64" \n",                    \
+			p->block_dur, p->block_count, p->bisvalid_dur,         \
+			p->bisvalid_count,p->bfind_dur,p->bfind_count,         \
+			p->bget_dur, p->bget_count);                           \
 		M0_LOG( M0_INFO, "  LOCK = %"PRIu64"; CHECK = %"PRIu64         \
 			"; ACT = %"PRIu64"; CLEANUP = %"PRIu64"\n",            \
 			p->LOCK_dur, p->CHECK_dur, p->ACT_dur, p->CLEANUP_dur);\
@@ -5528,9 +5539,20 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 			"; NEXTDOWN = %"PRIu64"\n",                            \
 			p->INIT_dur, p->SETUP_dur, p->DOWN_dur,                \
 			p->NEXTDOWN_iter_count,p->NEXTDOWN_dur);               \
+		M0_LOG( M0_INFO, " MAX VALUES NEXTDOWN Phases : Lock  duration \
+			 = %"PRIu64" count = %"PRIu64"; Isvalid duration       \
+			 = %"PRIu64" count = %"PRIu64"; Find  duration         \
+			 = %"PRIu64" count = %"PRIu64"; Get duration           \
+			 = %"PRIu64" count = %"PRIu64" \n",                    \
+			p->block_dur, p->block_count, p->bisvalid_dur,         \
+			p->bisvalid_count,p->bfind_dur,p->bfind_count,         \
+			p->bget_dur, p->bget_count);                           \
 		M0_LOG( M0_INFO, "  LOCK = %"PRIu64"; CHECK = %"PRIu64         \
 			"; ACT = %"PRIu64"; CLEANUP = %"PRIu64"\n",            \
 			p->LOCK_dur, p->CHECK_dur, p->ACT_dur, p->CLEANUP_dur);\
+		M0_LOG( M0_INFO, "  AVERAGE VALUES: NEXTDOWN =%"PRIu64 ";      \
+			 ACT = %"PRIu64 "\n",                                  \
+			stats.nxt_dwn_avg, stats.act_avg);                     \
 	} while (0)
 
 #define PRINT_STATS_FOR_DEL(operation, stats)                                  \
@@ -5566,6 +5588,9 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 			PRIu64"; CLEANUP = %"PRIu64"\n",                       \
 			p->FREENODE_iter_count, p->FREENODE_dur,               \
 			p->CLEANUP_dur);                                       \
+		M0_LOG( M0_INFO, "  AVERAGE VALUES: NEXTDOWN =%"PRIu64 ";      \
+			 ACT = %"PRIu64 "\n",                                  \
+			stats.nxt_dwn_avg, stats.act_avg);                     \
 	} while (0)
 
 #define PRINT_GENERIC_STATS(operation, stats)                                  \
@@ -5574,10 +5599,29 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 			stats.min_dur, stats.max_dur, stats.avg_dur,           \
 			stats.sample_count);
 
+#define PRINT_AVERAGE(stat)                                               \
+{                                                                          \
+	M0_LOG( M0_INFO, " Duration VALUES NEXTDOWN Phases : Lock  \
+	 = %"PRIu64" Isvalid = %"PRIu64"; Find       \
+	 = %"PRIu64" Get = %"PRIu64" \n",                    \
+	stat.block_dur, stat.bisvalid_dur, stat.bfind_dur,          \
+	stat.bget_dur);                                     \
+	M0_LOG( M0_INFO, " Count VALUES NEXTDOWN Phases : Lock  \
+	 = %"PRIu64" Isvalid = %"PRIu64"; Find       \
+	 = %"PRIu64" Get = %"PRIu64" \n",                    \
+	stat.block_count, stat.bisvalid_count, stat.bfind_count,          \
+	stat.bget_count);                                     \
+	M0_LOG( M0_INFO, " AVERAGE VALUES NEXTDOWN Phases : Lock  \
+	 = %"PRIu64" Isvalid = %"PRIu64"; Find       \
+	 = %"PRIu64" Get = %"PRIu64" \n",                    \
+	stat.block_avg, stat.bisvalid_avg, stat.bfind_avg,          \
+	stat.bget_avg);                                     \
+}
 #ifndef __KERNEL__
 struct btree_stats get_records = INIT_BTREE_STATS();
 struct btree_stats put_records = INIT_BTREE_STATS();
 struct btree_stats del_records = INIT_BTREE_STATS();
+struct stats_nextdown_phase snp = {0};
 #endif
 
 
@@ -7457,6 +7501,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 	struct level          *lev;
 	uint64_t               startTime;
 	uint64_t               endTime;
+	uint64_t               startTime_nxt;
+	uint64_t               endTime_nxt;
 	int64_t                ret;
 	union stats_ext_data *all_data = (union stats_ext_data *)bop->all_data;
 
@@ -7520,7 +7566,11 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 			lev->l_node = oi->i_nop.no_node;
 			s.s_node = oi->i_nop.no_node;
 
+			RECORD_START_TIME(startTime_nxt);
 			bnode_lock(lev->l_node);
+			RECORD_END_TIME(endTime_nxt);
+			all_data->get_stats.block_dur += endTime_nxt-startTime_nxt;
+			all_data->get_stats.block_count++;
 			lev->l_seq = lev->l_node->n_seq;
 
 			/**
@@ -7533,19 +7583,26 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 			 * other thread which has lock is working on the same
 			 * node(lev->l_node) which is pointed by current thread.
 			 */
+			RECORD_START_TIME(startTime_nxt);
 			if (!bnode_isvalid(lev->l_node) || (oi->i_used > 0 &&
 							    bnode_count_rec(lev->l_node) == 0)) {
 				bnode_unlock(lev->l_node);
 				ret = m0_sm_op_sub(&bop->bo_op, P_CLEANUP,
 						    P_SETUP);
 				RECORD_END_TIME(endTime);
+				all_data->get_stats.bisvalid_dur += endTime-startTime_nxt;
+				all_data->get_stats.bisvalid_count++;
 				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
 				return ret;
 			}
 
+			RECORD_START_TIME(startTime_nxt);
 			if (bop->bo_opc == M0_BO_GET) {
 				oi->i_key_found =
 						  bnode_find(&s, &bop->bo_rec.r_key);
+				RECORD_END_TIME(endTime_nxt);
+				all_data->get_stats.bfind_dur += endTime_nxt-startTime_nxt;
+				all_data->get_stats.bfind_count++;
 				lev->l_idx = s.s_idx;
 			}
 
@@ -7582,9 +7639,12 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 				}
 
 				bnode_unlock(lev->l_node);
+				RECORD_START_TIME(startTime_nxt);
 				ret = bnode_get(&oi->i_nop, tree, &child,
 						 P_NEXTDOWN);
 				RECORD_END_TIME(endTime);
+				all_data->get_stats.bget_dur += endTime-startTime_nxt;
+				all_data->get_stats.bget_count++;
 				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
 				return ret;
 			} else {
@@ -13379,7 +13439,6 @@ static void btree_ut_perf(bool old_btree)
 			  };
 	struct ut_cb_data          put_data;
 	struct ut_cb_data          get_data;
-
 	struct m0_be_btree         *be_tree;
 	struct m0_fid               be_tree_fid;
 	union stats_ext_data        all_data;
@@ -13521,6 +13580,8 @@ static void btree_ut_perf(bool old_btree)
 		m0_be_tx_close_sync(tx);
 		m0_be_tx_fini(tx);
 
+		put_records.nxt_dwn_duration += all_data.put_stats.NEXTDOWN_dur;
+		put_records.act_duration += all_data.put_stats.ACT_dur;
 		UPDATE_STATS(put_records, startTime, endTime, all_data);
 
 		i += jump_value;
@@ -13602,15 +13663,25 @@ static void btree_ut_perf(bool old_btree)
 		RECORD_END_TIME(endTime);
 		M0_ASSERT(rc == M0_BSC_SUCCESS);
 
+		get_records.nxt_dwn_duration += all_data.get_stats.NEXTDOWN_dur;
+		get_records.act_duration += all_data.get_stats.ACT_dur;
+		snp.block_dur += all_data.get_stats.block_dur;
+		snp.block_count +=  all_data.get_stats.block_count;
+		snp.bisvalid_dur += all_data.get_stats.bisvalid_dur;
+		snp.bisvalid_count +=  all_data.get_stats.bisvalid_count;
+		snp.bfind_dur += all_data.get_stats.bfind_dur;
+		snp.bfind_count +=  all_data.get_stats.bfind_count;
+		snp.bget_dur += all_data.get_stats.bget_dur;
+		snp.bget_count +=  all_data.get_stats.bget_count;
 		UPDATE_STATS(get_records, startTime, endTime, all_data);
-
+		snp.num_sample = get_records.sample_count;
 		i += jump_value;
 		if (i > rec_count) {
 			iter_start++;
 			i = iter_start;
 		}
 	}
-
+	UPDATE_AVERAGE(snp);
 	if (!old_btree) {
 		rc = M0_BTREE_OP_SYNC_WITH_RC(&b_op,
 					      m0_btree_close(tree, &b_op));
@@ -13695,6 +13766,8 @@ static void btree_ut_perf(bool old_btree)
 		m0_be_tx_close_sync(tx);
 		m0_be_tx_fini(tx);
 
+		del_records.nxt_dwn_duration += all_data.del_stats.NEXTDOWN_dur;
+		del_records.act_duration += all_data.del_stats.ACT_dur;
 		UPDATE_STATS(del_records, startTime, endTime, all_data);
 
 		i += jump_value;
@@ -13744,10 +13817,12 @@ static void btree_ut_perf(bool old_btree)
 	if (!old_btree) {
 		PRINT_STATS_FOR_PUT("PUT operation stats for New BTree", put_records);
 		PRINT_STATS_FOR_GET("GET operation stats for New BTree", get_records);
+		PRINT_AVERAGE(snp);
 		PRINT_STATS_FOR_DEL("DEL operation stats for New BTree", del_records);
 	} else {
 		PRINT_STATS_FOR_PUT("PUT operation stats for Old BTree", put_records);
 		PRINT_STATS_FOR_GET("GET operation stats for Old BTree", get_records);
+		PRINT_AVERAGE(snp);
 		PRINT_STATS_FOR_DEL("DEL operation stats for Old BTree", del_records);
 	}
 }

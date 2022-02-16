@@ -64,6 +64,16 @@ struct stats_get_data {
 	uint64_t CHECK_dur;
 	uint64_t ACT_dur;
 	uint64_t CLEANUP_dur;
+//NEXTDOWN
+	uint64_t block_dur;
+	uint64_t block_count;
+	uint64_t bisvalid_dur;
+	uint64_t bisvalid_count;
+	uint64_t bfind_dur;
+	uint64_t bfind_count;
+	uint64_t bget_dur;
+	uint64_t bget_count;
+
 };
 
 struct stats_del_data {
@@ -80,6 +90,22 @@ struct stats_del_data {
 	uint64_t FREENODE_dur;
 	uint64_t FREENODE_iter_count;
 	uint64_t CLEANUP_dur;
+};
+
+struct stats_nextdown_phase {
+	uint64_t block_dur;
+	uint64_t bfind_dur;
+	uint64_t bget_dur;
+	uint64_t block_count;
+	uint64_t bfind_count;
+	uint64_t bget_count;
+	uint64_t block_avg;
+	uint64_t bfind_avg;
+	uint64_t bget_avg;
+	uint64_t bisvalid_dur;
+	uint64_t bisvalid_count;
+	uint64_t bisvalid_avg;
+	uint64_t num_sample;
 };
 
 union stats_ext_data {
@@ -115,6 +141,12 @@ struct btree_stats {
 	uint64_t tot_dur;
 	uint64_t sample_count;
 
+	uint64_t nxt_dwn_duration;
+	uint64_t act_duration;
+
+	uint64_t nxt_dwn_avg;
+	uint64_t act_avg;
+
 	union stats_ext_data min_data;
 
 	union stats_ext_data max_data;
@@ -136,8 +168,17 @@ struct btree_stats {
 			stats.sample_count++;                                  \
 			stats.tot_dur += duration;                             \
 			stats.avg_dur = stats.tot_dur / stats.sample_count;    \
+			stats.nxt_dwn_avg = stats.nxt_dwn_duration / stats.sample_count;    \
+			stats.act_avg = stats.act_duration / stats.sample_count;    \
 		}
 
+#define UPDATE_AVERAGE(stat)                                             \
+	{							 \
+		stat.block_avg = stat.block_dur/stat.num_sample; \
+		stat.bfind_avg = stat.bfind_dur/stat.num_sample; \
+		stat.bget_avg = stat.bget_dur/stat.num_sample;    \
+		stat.bisvalid_avg = stat.bisvalid_dur/stat.num_sample;    \
+	}
 #ifndef __KERNEL__
 extern struct btree_stats get_records;
 extern struct btree_stats put_records;
