@@ -867,6 +867,16 @@ enum direction {
 struct nd;
 struct slot;
 
+// static inline uint64_t bt_rdtsc(void)
+// {
+// 	uint32_t count_hi;
+// 	uint32_t count_lo;
+
+// 	__asm__ __volatile__("rdtsc" : "=a"(count_lo), "=d"(count_hi));
+
+// 	return ((uint64_t)count_lo) | (((uint64_t)count_hi) << 32);
+// }
+
 /**
  *  Different types of btree node formats are supported. While the basic btree
  *  operations remain the same, the differences are encapsulated in the nodes
@@ -1447,6 +1457,9 @@ int64_t lru_space_wm_target = LUSW_TARGET;
  * watermark.
  */
 int64_t lru_space_wm_high   = LUSW_HIGH;
+int64_t isNEXTDOWN = 0;
+struct stats_gnf gnf = {0};
+struct stats_gng gng = {0};
 
 M0_TL_DESCR_DEFINE(ndlist, "node descr list", static, struct nd,
 		   n_linkage, n_magic, M0_BTREE_ND_LIST_MAGIC,
@@ -1639,31 +1652,54 @@ static bool bnode_find(struct slot *slot, struct m0_btree_key *find_key)
 	int                         diff;
 	int                         m;
 	struct m0_btree_rec_key_op *keycmp = &slot->s_node->n_tree->t_keycmp;
+	uint64_t                    startTime = 0;
+	uint64_t                    endTime = 0;
+	uint64_t                    stTime = 0;
+	uint64_t                    etTime = 0;
 
+	RECORD_START_TIME(stTime);
 	key.k_data           = M0_BUFVEC_INIT_BUF(&p_key, &ksize);
 	key_slot.s_node      = slot->s_node;
 	key_slot.s_rec.r_key = key;
 
-	M0_PRE(bnode_invariant(slot->s_node));
-	M0_PRE(find_key->k_data.ov_vec.v_nr == 1);
+	// M0_PRE(bnode_invariant(slot->s_node));
+	// M0_PRE(find_key->k_data.ov_vec.v_nr == 1);
 
 	while (i + 1 < j) {
 		m = (i + j) / 2;
 
 		key_slot.s_idx = m;
+		RECORD_START_TIME(startTime);
 		bnode_key(&key_slot);
+		RECORD_END_TIME(endTime);
+		if (isNEXTDOWN == 1) {
+			gnf.bn_key_durr += endTime - startTime;
+			gnf.bn_key_count ++;
+		}
 
 		if (keycmp->rko_keycmp != NULL) {
 			void     *key_data;
 			void     *find_data;
 
+			RECORD_START_TIME(startTime);
 			key_data = M0_BUFVEC_DATA(&key.k_data);
 			find_data = M0_BUFVEC_DATA(&find_key->k_data);
 			diff = keycmp->rko_keycmp(key_data, find_data);
+			RECORD_END_TIME(endTime);
+			if (isNEXTDOWN == 1) {
+				gnf.ext_keycmp_durr += endTime - startTime;
+				gnf.ext_keycmp_count ++;
+			}
 		} else {
+			RECORD_START_TIME(startTime);
 			m0_bufvec_cursor_init(&cur_1, &key.k_data);
 			m0_bufvec_cursor_init(&cur_2, &find_key->k_data);
 			diff = m0_bufvec_cursor_cmp(&cur_1, &cur_2);
+			RECORD_END_TIME(endTime);
+			if (isNEXTDOWN == 1) {
+				gnf.int_keycmp_durr += endTime - startTime;
+				gnf.int_keycmp_count ++;
+			}
 		}
 
 		M0_ASSERT(i < m && m < j);
@@ -1678,7 +1714,11 @@ static bool bnode_find(struct slot *slot, struct m0_btree_key *find_key)
 	}
 
 	slot->s_idx = j;
-
+	RECORD_END_TIME(etTime);
+	if (isNEXTDOWN == 1) {
+		gnf.inside_durr += etTime - stTime;
+		gnf.inside_count ++;
+	}
 	return (i == j);
 }
 
@@ -2006,7 +2046,11 @@ static int64_t bnode_get(struct node_op *op, struct td *tree,
 	struct nd              *node;
 	bool                    in_lrulist;
 	uint32_t                ntype;
-
+	uint64_t                startTime;
+	uint64_t                endTime;
+	uint64_t                stTime;
+	uint64_t                etTime;
+	RECORD_START_TIME(stTime);
 	/**
 	 * TODO: Include function bnode_access() during async mode of btree
 	 * operations to ensure that the node data is loaded form the segment.
@@ -2020,31 +2064,64 @@ static int64_t bnode_get(struct node_op *op, struct td *tree,
 	 * Replace it with a different global lock once hash
 	 * functionality is implemented.
 	 */
-
+	RECORD_START_TIME(startTime);
 	m0_rwlock_write_lock(&list_lock);
-
+	RECORD_END_TIME(endTime);
+	if (isNEXTDOWN == 1) {
+		gng.list_lock_durr += endTime - startTime;
+		gng.list_lock_count++;
+	}
 	/**
 	 * If the node was deleted before node_get can acquire list_lock, then
 	 * restart the tick funcions.
 	 */
+	RECORD_START_TIME(startTime);
 	if (!segaddr_header_isvalid(addr)) {
 		op->no_op.o_sm.sm_rc = M0_ERR(-EINVAL);
 		m0_rwlock_write_unlock(&list_lock);
+		RECORD_END_TIME(etTime);
+		if (isNEXTDOWN == 1) {
+			gng.inside_durr += etTime - stTime;
+			gng.inside_count++;
+		}
 		return nxt;
 	}
+	RECORD_END_TIME(endTime);
+	if (isNEXTDOWN == 1) {
+		gng.seg_isvalid_true_durr += endTime - startTime;
+		gng.seg_isvalid_true_count++;
+	}
+
+	RECORD_START_TIME(startTime);
 	ntype = segaddr_ntype_get(addr);
 	nt = btree_node_format[ntype];
 
 	op->no_node = nt->nt_opaque_get(addr);
+	RECORD_END_TIME(endTime);
+	if (isNEXTDOWN == 1) {
+		gng.opq_durr += endTime - startTime;
+		gng.opq_count++;
+	}
 
 	if (op->no_node != NULL &&
 	    op->no_node->n_addr.as_core == addr->as_core) {
-
+		RECORD_START_TIME(startTime);
 		bnode_lock(op->no_node);
+		RECORD_END_TIME(endTime);
+		if (isNEXTDOWN == 1) {
+			gng.block1_durr += endTime - startTime;
+			gng.block1_count++;
+		}
+
 		if (!op->no_node->n_be_node_valid) {
 			op->no_op.o_sm.sm_rc = M0_ERR(-EACCES);
 			bnode_unlock(op->no_node);
 			m0_rwlock_write_unlock(&list_lock);
+			RECORD_END_TIME(etTime);
+			if (isNEXTDOWN == 1) {
+				gng.inside_durr += etTime - stTime;
+				gng.inside_count++;
+			}
 			return nxt;
 		}
 
@@ -2055,8 +2132,14 @@ static int64_t bnode_get(struct node_op *op, struct td *tree,
 			 * The node descriptor is in LRU list. Remove from lru
 			 * list and add to active list.
 			 */
+			RECORD_START_TIME(startTime);
 			ndlist_tlist_del(op->no_node);
 			ndlist_tlist_add(&btree_active_nds, op->no_node);
+			RECORD_END_TIME(endTime);
+			if (isNEXTDOWN == 1) {
+				gng.lru_durr += endTime - startTime;
+				gng.lru_count++;
+			}
 			lru_space_used -= (m0_be_chunk_header_size() +
 					   op->no_node->n_size);
 			/**
@@ -2072,6 +2155,7 @@ static int64_t bnode_get(struct node_op *op, struct td *tree,
 		 * If node descriptor is already allocated for the node, no need
 		 * to allocate node descriptor again.
 		 */
+		RECORD_START_TIME(startTime);
 		op->no_node = nt->nt_opaque_get(addr);
 		if (op->no_node != NULL &&
 		    op->no_node->n_addr.as_core == addr->as_core) {
@@ -2079,13 +2163,29 @@ static int64_t bnode_get(struct node_op *op, struct td *tree,
 			op->no_node->n_ref++;
 			bnode_unlock(op->no_node);
 			m0_rwlock_write_unlock(&list_lock);
+			RECORD_END_TIME(etTime);
+			if (isNEXTDOWN == 1) {
+				gng.inside_durr += etTime - stTime;
+				gng.inside_count++;
+			}
 			return nxt;
+		}
+		RECORD_END_TIME(endTime);
+		if (isNEXTDOWN == 1) {
+			gng.block2_durr += endTime - startTime;
+			gng.block2_count++;
 		}
 		/**
 		 * If node descriptor is not present allocate a new one
 		 * and assign to node.
 		 */
+		RECORD_START_TIME(startTime);
 		node = m0_alloc(sizeof *node);
+		RECORD_END_TIME(endTime);
+		if (isNEXTDOWN == 1) {
+			gng.alloc_durr += endTime - startTime;
+			gng.alloc_count++;
+		}
 		/**
 		 * TODO: If Node-alloc fails, free up any node descriptor from
 		 * lru list and add assign to node. Unmap and map back the node
@@ -2104,14 +2204,30 @@ static int64_t bnode_get(struct node_op *op, struct td *tree,
 		m0_rwlock_init(&node->n_lock);
 		op->no_node           = node;
 		nt->nt_opaque_set(addr, node);
+		RECORD_START_TIME(startTime);
 		ndlist_tlink_init_at(op->no_node, &btree_active_nds);
-
+		RECORD_END_TIME(endTime);
+		if (isNEXTDOWN == 1) {
+			gng.tlink_durr += endTime - startTime;
+			gng.tlink_count++;
+		}
+		RECORD_START_TIME(startTime);
 		if ((!IS_INTERNAL_NODE(op->no_node)) &&
 		    bnode_crctype_get(op->no_node) != M0_BCT_NO_CRC) {
 			bnode_crc_validate(op->no_node);
 		}
+		RECORD_END_TIME(endTime);
+		if (isNEXTDOWN == 1) {
+			gng.crc_durr += endTime - startTime;
+			gng.crc_count++;
+		}
 	}
 	m0_rwlock_write_unlock(&list_lock);
+	RECORD_END_TIME(etTime);
+	if (isNEXTDOWN == 1) {
+		gng.inside_durr += etTime - stTime;
+		gng.inside_count++;
+	}
 	return nxt;
 }
 
@@ -5469,8 +5585,14 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 		.avg_dur = 0,                                                  \
 		.tot_dur = 0,                                                  \
 		.sample_count = 0,                                             \
-		.min_data = {},                                                \
-		.max_data = {},                                                \
+		.min_data = {},                                               \
+		.max_data = {},                                               \
+		.act_avg = 0,                                                  \
+		.init_avg = 0,                                                 \
+		.setup_avg = 0,                                                \
+		.down_avg = 0,                                                 \
+		.cleanup_avg = 0,                                              \
+		.nxt_dwn_avg = 0,                                              \
 		}
 
 #define PRINT_STATS_FOR_PUT(operation, stats)                                  \
@@ -5522,37 +5644,142 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 			"; NEXTDOWN = %"PRIu64"\n",                            \
 			p->INIT_dur, p->SETUP_dur, p->DOWN_dur,                \
 			p->NEXTDOWN_iter_count,p->NEXTDOWN_dur);               \
-		M0_LOG( M0_INFO, " MIN VALUES NEXTDOWN Phases : Lock  duration \
-			 = %"PRIu64" count = %"PRIu64"; Isvalid duration       \
-			 = %"PRIu64" count = %"PRIu64"; Find  duration         \
-			 = %"PRIu64" count = %"PRIu64"; Get duration           \
-			 = %"PRIu64" count = %"PRIu64" \n",                    \
-			p->block_dur, p->block_count, p->bisvalid_dur,         \
-			p->bisvalid_count,p->bfind_dur,p->bfind_count,         \
-			p->bget_dur, p->bget_count);                           \
 		M0_LOG( M0_INFO, "  LOCK = %"PRIu64"; CHECK = %"PRIu64         \
 			"; ACT = %"PRIu64"; CLEANUP = %"PRIu64"\n",            \
 			p->LOCK_dur, p->CHECK_dur, p->ACT_dur, p->CLEANUP_dur);\
+		M0_LOG( M0_INFO, " MIN VALUES NEXTDOWN Phases : Lock  duration" \
+			 "= %"PRIu64" count = %"PRIu64"; Isvalid duration"      \
+			 "= %"PRIu64" count = %"PRIu64"; Find  duration"        \
+			 "= %"PRIu64" count = %"PRIu64"; Get duration"          \
+			 "= %"PRIu64" count = %"PRIu64" \n",                    \
+			p->block_dur, p->block_count, p->bisvalid_dur,         \
+			p->bisvalid_count,p->bfind_dur,p->bfind_count,         \
+			p->bget_dur, p->bget_count);                           \
+		M0_LOG( M0_INFO, "MIN VALUES NEXTDOWN FIND section:"           \
+			"Bnode_key dur =%"PRIu64" count =%"PRIu64";"           \
+			"External Cmp dur =%"PRIu64" count =%"PRIu64";"        \
+			"Internal Cmp dur =%"PRIu64" count =%"PRIu64"\n"      \
+			"Inside dur =%"PRIu64" count =%"PRIu64"\n",      \
+			p->nxt_gnf.bn_key_durr, p->nxt_gnf.bn_key_count ,      \
+			p->nxt_gnf.ext_keycmp_durr, p->nxt_gnf.ext_keycmp_count,\
+			p->nxt_gnf.int_keycmp_durr, p->nxt_gnf.int_keycmp_count, \
+			p->nxt_gnf.inside_durr, p->nxt_gnf.inside_count); \
+		M0_LOG( M0_INFO, "MIN VALUES NEXTDOWN Get section:"           \
+			"seg_isvalid true dur =%"PRIu64" ;"           \
+			"opq dur =%"PRIu64" ;"        \
+			"List lock dur =%"PRIu64" ;"        \
+			"Bnode lock 1 dur =%"PRIu64" ;"        \
+			"Bnode lock 2 dur =%"PRIu64" ;"        \
+			"Alloc dur =%"PRIu64" ;"        \
+			"Tlink dur =%"PRIu64" ;"        \
+			"CRC dur =%"PRIu64" ;",      \
+			p->nxt_gng.seg_isvalid_true_durr,  \
+			p->nxt_gng.opq_durr, \
+			p->nxt_gng.list_lock_durr,  \
+			p->nxt_gng.block1_durr,  \
+			p->nxt_gng.block2_durr,  \
+			p->nxt_gng.alloc_durr,  \
+			p->nxt_gng.tlink_durr,  \
+			p->nxt_gng.crc_durr); \
+		M0_LOG( M0_INFO, "Inside dur =%"PRIu64" ;"        \
+			"LRU dur =%"PRIu64" \n",\
+			p->nxt_gng.inside_durr,  \
+			p->nxt_gng.lru_durr);\
+		M0_LOG( M0_INFO, "MIN VALUES NEXTDOWN Get section:"           \
+			"seg_isvalid true count =%"PRIu64" ;"           \
+			"opq count =%"PRIu64" ;"        \
+			"List lock count =%"PRIu64" ;"        \
+			"Bnode lock 1 count =%"PRIu64" ;"        \
+			"Bnode lock 2 count =%"PRIu64" ;"        \
+			"Alloc count =%"PRIu64" ;"        \
+			"Tlink count =%"PRIu64" ;"        \
+			"CRC count =%"PRIu64" ;",        \
+			p->nxt_gng.seg_isvalid_true_count,  \
+			p->nxt_gng.opq_count, \
+			p->nxt_gng.list_lock_count,  \
+			p->nxt_gng.block1_count,  \
+			p->nxt_gng.block2_count,  \
+			p->nxt_gng.alloc_count,  \
+			p->nxt_gng.tlink_count,  \
+			p->nxt_gng.crc_count); \
+		M0_LOG( M0_INFO, "Inside count =%"PRIu64" ;"        \
+			"LRU count =%"PRIu64" \n",\
+			p->nxt_gng.inside_count,  \
+			p->nxt_gng.lru_count);\
 		p = &stats.max_data.get_stats;                                 \
 		M0_LOG( M0_INFO, " MAX VALUES: INIT = %"PRIu64"; SETUP = %"    \
 			PRIu64"; DOWN = %"PRIu64"; NEXTDOWN iter = %"PRIu64    \
 			"; NEXTDOWN = %"PRIu64"\n",                            \
 			p->INIT_dur, p->SETUP_dur, p->DOWN_dur,                \
 			p->NEXTDOWN_iter_count,p->NEXTDOWN_dur);               \
-		M0_LOG( M0_INFO, " MAX VALUES NEXTDOWN Phases : Lock  duration \
-			 = %"PRIu64" count = %"PRIu64"; Isvalid duration       \
-			 = %"PRIu64" count = %"PRIu64"; Find  duration         \
-			 = %"PRIu64" count = %"PRIu64"; Get duration           \
-			 = %"PRIu64" count = %"PRIu64" \n",                    \
-			p->block_dur, p->block_count, p->bisvalid_dur,         \
-			p->bisvalid_count,p->bfind_dur,p->bfind_count,         \
-			p->bget_dur, p->bget_count);                           \
 		M0_LOG( M0_INFO, "  LOCK = %"PRIu64"; CHECK = %"PRIu64         \
 			"; ACT = %"PRIu64"; CLEANUP = %"PRIu64"\n",            \
 			p->LOCK_dur, p->CHECK_dur, p->ACT_dur, p->CLEANUP_dur);\
-		M0_LOG( M0_INFO, "  AVERAGE VALUES: NEXTDOWN =%"PRIu64 ";      \
-			 ACT = %"PRIu64 "\n",                                  \
-			stats.nxt_dwn_avg, stats.act_avg);                     \
+		M0_LOG( M0_INFO, " MAX VALUES NEXTDOWN Phases : Lock  duration" \
+			 "= %"PRIu64" count = %"PRIu64"; Isvalid duration"      \
+			 "= %"PRIu64" count = %"PRIu64"; Find  duration"        \
+			 "= %"PRIu64" count = %"PRIu64"; Get duration"          \
+			 "= %"PRIu64" count = %"PRIu64" \n",                    \
+			p->block_dur, p->block_count, p->bisvalid_dur,         \
+			p->bisvalid_count,p->bfind_dur,p->bfind_count,         \
+			p->bget_dur, p->bget_count);                           \
+		M0_LOG( M0_INFO, "MAX VALUES NEXTDOWN FIND section:"           \
+			"Bnode_key dur =%"PRIu64" count =%"PRIu64";"           \
+			"External Cmp dur =%"PRIu64" count =%"PRIu64";"        \
+			"Internal Cmp dur =%"PRIu64" count =%"PRIu64"\n"      \
+			"Inside dur =%"PRIu64" count =%"PRIu64"\n",      \
+			p->nxt_gnf.bn_key_durr, p->nxt_gnf.bn_key_count ,      \
+			p->nxt_gnf.ext_keycmp_durr, p->nxt_gnf.ext_keycmp_count,\
+			p->nxt_gnf.int_keycmp_durr, p->nxt_gnf.int_keycmp_count, \
+			p->nxt_gnf.inside_durr, p->nxt_gnf.inside_count); \
+		M0_LOG( M0_INFO, "MAX VALUES NEXTDOWN Get section:"           \
+			"seg_isvalid true dur =%"PRIu64" ;"           \
+			"opq dur =%"PRIu64" ;"        \
+			"List lock dur =%"PRIu64" ;"        \
+			"Bnode lock 1 dur =%"PRIu64" ;"        \
+			"Bnode lock 2 dur =%"PRIu64" ;"        \
+			"Alloc dur =%"PRIu64" ;"        \
+			"Tlink dur =%"PRIu64" ;"        \
+			"CRC dur =%"PRIu64" ;",      \
+			p->nxt_gng.seg_isvalid_true_durr,  \
+			p->nxt_gng.opq_durr, \
+			p->nxt_gng.list_lock_durr,  \
+			p->nxt_gng.block1_durr,  \
+			p->nxt_gng.block2_durr,  \
+			p->nxt_gng.alloc_durr,  \
+			p->nxt_gng.tlink_durr,  \
+			p->nxt_gng.crc_durr); \
+		M0_LOG( M0_INFO, "Inside dur =%"PRIu64" ;"        \
+			"LRU dur =%"PRIu64" \n",\
+			p->nxt_gng.inside_durr,  \
+			p->nxt_gng.lru_durr);\
+		M0_LOG( M0_INFO, "MAX VALUES NEXTDOWN Get section:"           \
+			"seg_isvalid true count =%"PRIu64" ;"           \
+			"opq count =%"PRIu64" ;"        \
+			"List lock count =%"PRIu64" ;"        \
+			"Bnode lock 1 count =%"PRIu64" ;"        \
+			"Bnode lock 2 count =%"PRIu64" ;"        \
+			"Alloc count =%"PRIu64" ;"        \
+			"Tlink count =%"PRIu64" ;"        \
+			"CRC count =%"PRIu64" ;",        \
+			p->nxt_gng.seg_isvalid_true_count,  \
+			p->nxt_gng.opq_count, \
+			p->nxt_gng.list_lock_count,  \
+			p->nxt_gng.block1_count,  \
+			p->nxt_gng.block2_count,  \
+			p->nxt_gng.alloc_count,  \
+			p->nxt_gng.tlink_count,  \
+			p->nxt_gng.crc_count); \
+		M0_LOG( M0_INFO, "Inside count =%"PRIu64" ;"        \
+			"LRU count =%"PRIu64" \n",\
+			p->nxt_gng.inside_count,  \
+			p->nxt_gng.lru_count);\
+		M0_LOG( M0_INFO, "  AVERAGE VALUES: NEXTDOWN dur=%"PRIu64""    \
+			 " count = %"PRIu64"; ACT dur= %"PRIu64";" \
+			 " INIT dur= %"PRIu64"; SETUP dur= %"PRIu64";" \
+			 "DOWN  dur= %"PRIu64"; CLEANUP  dur= %"PRIu64";\n", \
+			stats.nxt_dwn_avg, stats.nxt_dwn_count, stats.act_avg, \
+			stats.init_avg, stats.setup_avg, stats.down_avg, stats.cleanup_avg);\
 	} while (0)
 
 #define PRINT_STATS_FOR_DEL(operation, stats)                                  \
@@ -5588,9 +5815,9 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 			PRIu64"; CLEANUP = %"PRIu64"\n",                       \
 			p->FREENODE_iter_count, p->FREENODE_dur,               \
 			p->CLEANUP_dur);                                       \
-		M0_LOG( M0_INFO, "  AVERAGE VALUES: NEXTDOWN =%"PRIu64 ";      \
-			 ACT = %"PRIu64 "\n",                                  \
-			stats.nxt_dwn_avg, stats.act_avg);                     \
+		M0_LOG( M0_INFO, "  AVERAGE VALUES: NEXTDOWN dur=%"PRIu64""    \
+			 " count = %"PRIu64"; ACT dur= %"PRIu64"\n",          \
+			stats.nxt_dwn_avg, stats.nxt_dwn_count, stats.act_avg);\
 	} while (0)
 
 #define PRINT_GENERIC_STATS(operation, stats)                                  \
@@ -5599,29 +5826,132 @@ static void vkvv_rec_del_credit(const struct nd *node, m0_bcount_t ksize,
 			stats.min_dur, stats.max_dur, stats.avg_dur,           \
 			stats.sample_count);
 
-#define PRINT_AVERAGE(stat)                                               \
+#define PRINT_AVERAGE_SNP(stat)                                               \
 {                                                                          \
-	M0_LOG( M0_INFO, " Duration VALUES NEXTDOWN Phases : Lock  \
-	 = %"PRIu64" Isvalid = %"PRIu64"; Find       \
-	 = %"PRIu64" Get = %"PRIu64" \n",                    \
+	M0_LOG( M0_INFO, " Duration VALUES NEXTDOWN Phases : Lock"  \
+	 "= %"PRIu64" Isvalid = %"PRIu64"; Find"       \
+	 "= %"PRIu64" Get = %"PRIu64" \n",                    \
 	stat.block_dur, stat.bisvalid_dur, stat.bfind_dur,          \
 	stat.bget_dur);                                     \
-	M0_LOG( M0_INFO, " Count VALUES NEXTDOWN Phases : Lock  \
-	 = %"PRIu64" Isvalid = %"PRIu64"; Find       \
-	 = %"PRIu64" Get = %"PRIu64" \n",                    \
+	M0_LOG( M0_INFO, " Count VALUES NEXTDOWN Phases : Lock"  \
+	 "= %"PRIu64" Isvalid = %"PRIu64"; Find"       \
+	 "= %"PRIu64" Get = %"PRIu64" \n",                    \
 	stat.block_count, stat.bisvalid_count, stat.bfind_count,          \
 	stat.bget_count);                                     \
-	M0_LOG( M0_INFO, " AVERAGE VALUES NEXTDOWN Phases : Lock  \
-	 = %"PRIu64" Isvalid = %"PRIu64"; Find       \
-	 = %"PRIu64" Get = %"PRIu64" \n",                    \
+	M0_LOG( M0_INFO, " AVERAGE VALUES NEXTDOWN Phases : Lock"  \
+	 "= %"PRIu64" Isvalid = %"PRIu64"; Find"       \
+	 "= %"PRIu64" Get = %"PRIu64" \n",                    \
 	stat.block_avg, stat.bisvalid_avg, stat.bfind_avg,          \
 	stat.bget_avg);                                     \
 }
+
+#define PRINT_AVERAGE_SAP(stat)                                               \
+{\
+	uint64_t avg = stat.cb_dur/stat.num_sample;\
+	M0_LOG( M0_INFO, " Duration Act cb =%"PRIu64"\n", stat.cb_dur);\
+	M0_LOG( M0_INFO, " Count Act cb =%"PRIu64"\n", stat.cb_count );\
+	M0_LOG( M0_INFO, " Avg Count Act cb =%"PRIu64"\n", avg );\
+}
+
+#define PRINT_AVERAGE_GNF(stat,num)\
+{\
+	uint64_t n = num;\
+	M0_LOG( M0_INFO, "TOTAL VALUES NEXTDOWN FIND section:"           \
+		"Bnode_key dur =%"PRIu64" count =%"PRIu64";"           \
+		"External Cmp dur =%"PRIu64" count =%"PRIu64";"        \
+		"Internal Cmp dur =%"PRIu64" count =%"PRIu64"\n"      \
+		"Inside dur =%"PRIu64" count =%"PRIu64"\n",      \
+		stat.bn_key_durr, stat.bn_key_count ,        \
+		stat.ext_keycmp_durr, stat.ext_keycmp_count, \
+		stat.int_keycmp_durr, stat.int_keycmp_count, \
+		stat.inside_durr, stat.inside_count); \
+	M0_LOG( M0_INFO, "AVERAGE NEXTDOWN FIND section:"           \
+		"Bnode_key dur =%"PRIu64" count =%"PRIu64";"           \
+		"External Cmp dur =%"PRIu64" count =%"PRIu64";"        \
+		"Internal Cmp dur =%"PRIu64" count =%"PRIu64"\n"      \
+		"Inside dur =%"PRIu64" count =%"PRIu64"\n",      \
+		(stat.bn_key_durr/n), (stat.bn_key_count/n),      \
+		(stat.ext_keycmp_durr/n), (stat.ext_keycmp_count/n),\
+		(stat.int_keycmp_durr/n), (stat.int_keycmp_count/n), \
+		(stat.inside_durr/n), (stat.inside_count/n)); \
+}
+
+#define PRINT_AVERAGE_GNG(stat,num)\
+{\
+	uint64_t n = num;\
+	M0_LOG( M0_INFO, "TOTAL VALUES NEXTDOWN Get section:"           \
+		"seg_isvalid true dur =%"PRIu64" ;"           \
+		"opq dur =%"PRIu64" ;"        \
+		"List lock dur =%"PRIu64" ;"        \
+		"Bnode lock 1 dur =%"PRIu64" ;"        \
+		"Bnode lock 2 dur =%"PRIu64" ;"        \
+		"Alloc dur =%"PRIu64" ;"        \
+		"Tlink dur =%"PRIu64" ;"        \
+		"CRC dur =%"PRIu64" ;",      \
+		stat.seg_isvalid_true_durr,  \
+		stat.opq_durr, \
+		stat.list_lock_durr,  \
+		stat.block1_durr,  \
+		stat.block2_durr,  \
+		stat.alloc_durr,  \
+		stat.tlink_durr,  \
+		stat.crc_durr); \
+	M0_LOG( M0_INFO, "Inside dur =%"PRIu64" ;"        \
+		"LRU dur =%"PRIu64" \n",\
+		stat.inside_durr,  \
+		stat.lru_durr);\
+	M0_LOG( M0_INFO, "TOTAL VALUES NEXTDOWN Get section:"           \
+		"seg_isvalid true count =%"PRIu64" ;"           \
+		"opq count =%"PRIu64" ;"        \
+		"List lock count =%"PRIu64" ;"        \
+		"Bnode lock 1 count =%"PRIu64" ;"        \
+		"Bnode lock 2 count =%"PRIu64" ;"        \
+		"Alloc count =%"PRIu64" ;"        \
+		"Tlink count =%"PRIu64" ;"        \
+		"CRC count =%"PRIu64" ;",        \
+		stat.seg_isvalid_true_count,  \
+		stat.opq_count, \
+		stat.list_lock_count,  \
+		stat.block1_count,  \
+		stat.block2_count,  \
+		stat.alloc_count,  \
+		stat.tlink_count,  \
+		stat.crc_count); \
+	M0_LOG( M0_INFO, "Inside count =%"PRIu64" ;"        \
+		"LRU count =%"PRIu64" \n",\
+		stat.inside_count,  \
+		stat.lru_count);\
+	M0_LOG( M0_INFO, "AVERAGE NEXTDOWN Get section:"           \
+		"seg_isvalid true dur =%"PRIu64" ;"           \
+		"opq dur =%"PRIu64" ;"        \
+		"List lock dur =%"PRIu64" ;"        \
+		"Bnode lock 1 dur =%"PRIu64" ;"        \
+		"Bnode lock 2 dur =%"PRIu64" ;"        \
+		"Alloc dur =%"PRIu64" ;"        \
+		"Tlink dur =%"PRIu64" ;"        \
+		"CRC dur =%"PRIu64" \n",      \
+		(stat.seg_isvalid_true_durr/n),  \
+		(stat.opq_durr/n), \
+		(stat.list_lock_durr/n),  \
+		(stat.block1_durr/n),  \
+		(stat.block2_durr/n),  \
+		(stat.alloc_durr/n),  \
+		(stat.tlink_durr/n),  \
+		(stat.crc_durr/n)); \
+	M0_LOG( M0_INFO, "Inside count =%"PRIu64" ;"        \
+		"LRU count =%"PRIu64" \n",\
+		(stat.inside_durr/n),  \
+		(stat.lru_durr/n));\
+}
+
 #ifndef __KERNEL__
 struct btree_stats get_records = INIT_BTREE_STATS();
 struct btree_stats put_records = INIT_BTREE_STATS();
 struct btree_stats del_records = INIT_BTREE_STATS();
 struct stats_nextdown_phase snp = {0};
+struct stats_act_phase      sap ={0};
+struct stats_gnf total_gnf = {0};
+struct stats_gng total_gng = {0};
 #endif
 
 
@@ -7504,6 +7834,7 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 	uint64_t               startTime_nxt;
 	uint64_t               endTime_nxt;
 	int64_t                ret;
+
 	union stats_ext_data *all_data = (union stats_ext_data *)bop->all_data;
 
 	switch (bop->bo_op.o_sm.sm_state) {
@@ -7556,6 +7887,7 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 		all_data->get_stats.DOWN_dur = endTime - startTime;
 		return ret;
 	case P_NEXTDOWN:
+		isNEXTDOWN = 1;
 		all_data->get_stats.NEXTDOWN_iter_count++;
 		RECORD_START_TIME(startTime);
 		if (oi->i_nop.no_op.o_sm.sm_rc == 0) {
@@ -7593,6 +7925,7 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 				all_data->get_stats.bisvalid_dur += endTime-startTime_nxt;
 				all_data->get_stats.bisvalid_count++;
 				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+				isNEXTDOWN = 0;
 				return ret;
 			}
 
@@ -7623,6 +7956,7 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 					ret = fail(bop, M0_ERR(-EFAULT));
 					RECORD_END_TIME(endTime);
 					all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+					isNEXTDOWN = 0;
 					return ret;
 				}
 
@@ -7635,6 +7969,7 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 							    P_CLEANUP, P_SETUP);
 					RECORD_END_TIME(endTime);
 					all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+					isNEXTDOWN = 0;
 					return ret;
 				}
 
@@ -7642,15 +7977,18 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 				RECORD_START_TIME(startTime_nxt);
 				ret = bnode_get(&oi->i_nop, tree, &child,
 						 P_NEXTDOWN);
+				RECORD_END_TIME(endTime_nxt);
 				RECORD_END_TIME(endTime);
-				all_data->get_stats.bget_dur += endTime-startTime_nxt;
+				all_data->get_stats.bget_dur += endTime_nxt-startTime_nxt;
 				all_data->get_stats.bget_count++;
 				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+				isNEXTDOWN = 0;
 				return ret;
 			} else {
 				bnode_unlock(lev->l_node);
 				RECORD_END_TIME(endTime);
 				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+				isNEXTDOWN = 0;
 				return P_LOCK;
 			}
 		} else {
@@ -7658,10 +7996,12 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 			ret = m0_sm_op_sub(&bop->bo_op, P_CLEANUP, P_SETUP);
 			RECORD_END_TIME(endTime);
 			all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+			isNEXTDOWN = 0;
 			return ret;
 		}
 		RECORD_END_TIME(endTime);
 		all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
+		isNEXTDOWN = 0;
 	case P_LOCK:
 		RECORD_START_TIME(startTime);
 		if (!lock_acquired) {
@@ -7776,7 +8116,11 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 			}
 		}
 
+		RECORD_START_TIME(startTime_nxt);
 		rc = bop->bo_cb.c_act(&bop->bo_cb, &s.s_rec);
+		RECORD_END_TIME(endTime_nxt);
+		all_data->get_stats.cb_dur += endTime_nxt - startTime_nxt;
+		all_data->get_stats.cb_count++;
 
 		lock_op_unlock(tree);
 		if (rc != 0) {
@@ -9846,7 +10190,7 @@ enum {
 	MAX_STREAM_CNT         = 20,
 
 	MIN_RECS_PER_STREAM    = 5,
-	MAX_RECS_PER_STREAM    = 2048,
+	MAX_RECS_PER_STREAM    = 200,
 
 	MAX_RECS_PER_THREAD    = 10000, /** Records count for each thread */
 
@@ -13398,14 +13742,23 @@ static const struct m0_be_btree_kv_ops be_btree_ops = {
 	.ko_compare = be_tree_cmp
 };
 
-
+static int ut_cmp_func(const void *key0, const void *key1)
+{
+	uint64_t a = *(uint64_t *)key0;
+	uint64_t b = *(uint64_t *)key1;
+	a = m0_byteorder_be64_to_cpu(a);
+	b = m0_byteorder_be64_to_cpu(b);
+	int res;
+	res = a < b ? -1 : (a == b ? 0 : 1);
+	return res;
+}
 /**
  * This unit test exercises different KV operations and finds the time taken for
  * executing those operations.
  */
 static void btree_ut_perf(bool old_btree)
 {
-	void                       *rnode;
+	void                       *rnode = NULL;
 	uint64_t                   i;
 	struct m0_btree_cb         ut_cb;
 	struct m0_be_tx            tx_data        = {};
@@ -13445,6 +13798,7 @@ static void btree_ut_perf(bool old_btree)
 	uint64_t                    jump_value = 500;
 	uint64_t                    total_records = rec_count;
 	uint64_t                    iter_start;
+	struct m0_btree_rec_key_op  keycmp = {};
 
 	M0_ENTRY();
 
@@ -13607,9 +13961,10 @@ static void btree_ut_perf(bool old_btree)
 	m0_be_seg_open(ut_seg->bus_seg);
 
 	if (!old_btree) {
+		keycmp.rko_keycmp = ut_cmp_func;
 		rc = M0_BTREE_OP_SYNC_WITH_RC(&b_op,
 					      m0_btree_open(rnode, rnode_sz, tree, seg,
-							    &b_op, NULL));
+							    &b_op, &keycmp));
 		M0_ASSERT(rc == 0);
 
 		get_data.key            = &rec.r_key;
@@ -13644,6 +13999,8 @@ static void btree_ut_perf(bool old_btree)
 		ut_cb.c_datum           = &get_data;
 
 		M0_SET0(&all_data.get_stats);
+		M0_SET0(&gnf);
+		M0_SET0(&gng);
 		RECORD_START_TIME(startTime);
 		if (!old_btree) {
 			rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
@@ -13665,6 +14022,12 @@ static void btree_ut_perf(bool old_btree)
 
 		get_records.nxt_dwn_duration += all_data.get_stats.NEXTDOWN_dur;
 		get_records.act_duration += all_data.get_stats.ACT_dur;
+		get_records.nxt_dwn_count += all_data.get_stats.NEXTDOWN_iter_count;
+		get_records.init_duration += all_data.get_stats.INIT_dur;
+		get_records.setup_duration += all_data.get_stats.SETUP_dur;
+		get_records.down_duration += all_data.get_stats.DOWN_dur;
+		get_records.cleanup_duration += all_data.get_stats.CLEANUP_dur;
+
 		snp.block_dur += all_data.get_stats.block_dur;
 		snp.block_count +=  all_data.get_stats.block_count;
 		snp.bisvalid_dur += all_data.get_stats.bisvalid_dur;
@@ -13673,8 +14036,19 @@ static void btree_ut_perf(bool old_btree)
 		snp.bfind_count +=  all_data.get_stats.bfind_count;
 		snp.bget_dur += all_data.get_stats.bget_dur;
 		snp.bget_count +=  all_data.get_stats.bget_count;
+
+		sap.cb_dur +=all_data.get_stats.cb_dur;
+		sap.cb_count +=all_data.get_stats.cb_count;
+
+		all_data.get_stats.nxt_gnf = gnf;
+		all_data.get_stats.nxt_gng = gng;
+
+		UPDATE_TOTAL_GNF(total_gnf,gnf);
+		UPDATE_TOTAL_GNG(total_gng,gng);
+
 		UPDATE_STATS(get_records, startTime, endTime, all_data);
 		snp.num_sample = get_records.sample_count;
+		sap.num_sample = get_records.sample_count;
 		i += jump_value;
 		if (i > rec_count) {
 			iter_start++;
@@ -13817,12 +14191,15 @@ static void btree_ut_perf(bool old_btree)
 	if (!old_btree) {
 		PRINT_STATS_FOR_PUT("PUT operation stats for New BTree", put_records);
 		PRINT_STATS_FOR_GET("GET operation stats for New BTree", get_records);
-		PRINT_AVERAGE(snp);
+		PRINT_AVERAGE_SNP(snp);
+		PRINT_AVERAGE_SAP(sap);
+		PRINT_AVERAGE_GNF(total_gnf,get_records.sample_count);
+		PRINT_AVERAGE_GNG(total_gng,get_records.sample_count);
 		PRINT_STATS_FOR_DEL("DEL operation stats for New BTree", del_records);
 	} else {
 		PRINT_STATS_FOR_PUT("PUT operation stats for Old BTree", put_records);
 		PRINT_STATS_FOR_GET("GET operation stats for Old BTree", get_records);
-		PRINT_AVERAGE(snp);
+		PRINT_AVERAGE_SNP(snp);
 		PRINT_STATS_FOR_DEL("DEL operation stats for Old BTree", del_records);
 	}
 }
@@ -13833,7 +14210,7 @@ static void ut_btree_compare_perf(void)
 
 	for (i = 1; i <= 1; i++) {
 		if (btree_node_format[i] != NULL)
-			btree_ut_perf(true);
+			btree_ut_perf(false);
 	}
 }
 
