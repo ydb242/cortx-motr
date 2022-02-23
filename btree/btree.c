@@ -7833,10 +7833,11 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 	uint64_t               endTime;
 	uint64_t               startTime_nxt;
 	uint64_t               endTime_nxt;
-	int64_t                ret;
-
+	int64_t                ret = 0;
+	int64_t                sub_cleanup_fini = 0;
 	union stats_ext_data *all_data = (union stats_ext_data *)bop->all_data;
-
+	bop->bo_op.o_sm.sm_state = 0;
+do {
 	switch (bop->bo_op.o_sm.sm_state) {
 	case P_INIT:
 		RECORD_START_TIME(startTime);
@@ -7845,31 +7846,37 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 			  bop->bo_opc == M0_BO_MAXKEY);
 		M0_ASSERT(bop->bo_i == NULL);
 		bop->bo_i = m0_alloc(sizeof *oi);
+		oi = bop->bo_i;
 		if (bop->bo_i == NULL) {
 			bop->bo_op.o_sm.sm_rc = M0_ERR(-ENOMEM);
 			RECORD_END_TIME(endTime);
 			all_data->get_stats.INIT_dur = endTime - startTime;
-			return P_DONE;
+			bop->bo_op.o_sm.sm_state = P_DONE;
+			break;
 		}
 		if ((bop->bo_flags & BOF_COOKIE) &&
 		    cookie_is_set(&bop->bo_rec.r_key.k_cookie)) {
 			RECORD_END_TIME(endTime);
 			all_data->get_stats.INIT_dur = endTime - startTime;
-			return P_COOKIE;
+			bop->bo_op.o_sm.sm_state = P_COOKIE;
+			break;
 		} else {
 			RECORD_END_TIME(endTime);
 			all_data->get_stats.INIT_dur = endTime - startTime;
-			return P_SETUP;
+			bop->bo_op.o_sm.sm_state = P_SETUP;
+			break;
 		}
 	case P_COOKIE:
 		if (cookie_is_valid(tree, &bop->bo_rec.r_key.k_cookie))
-			return P_LOCK;
+			bop->bo_op.o_sm.sm_state = P_LOCK;
 		else
-			return P_SETUP;
+			bop->bo_op.o_sm.sm_state = P_SETUP;
+		break;
 	case P_LOCKALL:
 		M0_ASSERT(bop->bo_flags & BOF_LOCKALL);
-		return lock_op_init(&bop->bo_op, &bop->bo_i->i_nop,
+		bop->bo_op.o_sm.sm_state = lock_op_init(&bop->bo_op, &bop->bo_i->i_nop,
 				    bop->bo_arbor->t_desc, P_SETUP);
+		break;
 	case P_SETUP:
 		RECORD_START_TIME(startTime);
 		oi->i_height = tree->t_height;
@@ -7885,7 +7892,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 				 P_NEXTDOWN);
 		RECORD_END_TIME(endTime);
 		all_data->get_stats.DOWN_dur = endTime - startTime;
-		return ret;
+		bop->bo_op.o_sm.sm_state = ret;
+		break;
 	case P_NEXTDOWN:
 		isNEXTDOWN = 1;
 		all_data->get_stats.NEXTDOWN_iter_count++;
@@ -7926,7 +7934,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 				all_data->get_stats.bisvalid_count++;
 				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
 				isNEXTDOWN = 0;
-				return ret;
+				bop->bo_op.o_sm.sm_state = ret;
+				break;
 			}
 
 			RECORD_START_TIME(startTime_nxt);
@@ -7957,7 +7966,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 					RECORD_END_TIME(endTime);
 					all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
 					isNEXTDOWN = 0;
-					return ret;
+					bop->bo_op.o_sm.sm_state = ret;
+					break;
 				}
 
 				oi->i_used++;
@@ -7970,7 +7980,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 					RECORD_END_TIME(endTime);
 					all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
 					isNEXTDOWN = 0;
-					return ret;
+					bop->bo_op.o_sm.sm_state = ret;
+					break;
 				}
 
 				bnode_unlock(lev->l_node);
@@ -7983,13 +7994,15 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 				all_data->get_stats.bget_count++;
 				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
 				isNEXTDOWN = 0;
-				return ret;
+				bop->bo_op.o_sm.sm_state = ret;
+				break;
 			} else {
 				bnode_unlock(lev->l_node);
 				RECORD_END_TIME(endTime);
 				all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
 				isNEXTDOWN = 0;
-				return P_LOCK;
+				bop->bo_op.o_sm.sm_state = P_LOCK;
+				break;
 			}
 		} else {
 			bnode_op_fini(&oi->i_nop);
@@ -7997,7 +8010,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 			RECORD_END_TIME(endTime);
 			all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
 			isNEXTDOWN = 0;
-			return ret;
+			bop->bo_op.o_sm.sm_state = ret;
+			break;
 		}
 		RECORD_END_TIME(endTime);
 		all_data->get_stats.NEXTDOWN_dur += endTime - startTime;
@@ -8009,7 +8023,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 					    bop->bo_arbor->t_desc, P_CHECK);
 			RECORD_END_TIME(endTime);
 			all_data->get_stats.LOCK_dur += endTime - startTime;
-			return ret;
+			bop->bo_op.o_sm.sm_state = ret;
+			break;
 		}
 		/** Fall through if LOCK is already acquired. */
 	case P_CHECK:
@@ -8026,7 +8041,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 						    P_LOCKALL);
 				RECORD_END_TIME(endTime);
 				all_data->get_stats.CHECK_dur += endTime - startTime;
-				return ret;
+				bop->bo_op.o_sm.sm_state = ret;
+				break;
 			}
 
 			if (oi->i_height != tree->t_height) {
@@ -8036,14 +8052,16 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 						    P_SETUP);
 				RECORD_END_TIME(endTime);
 				all_data->get_stats.CHECK_dur += endTime - startTime;
-				return ret;
+				bop->bo_op.o_sm.sm_state = ret;
+				break;
 			} else {
 				/* If height is same, put back all the nodes. */
 				lock_op_unlock(tree);
 				level_put(oi);
 				RECORD_END_TIME(endTime);
 				all_data->get_stats.CHECK_dur += endTime - startTime;
-				return P_DOWN;
+				bop->bo_op.o_sm.sm_state = P_DOWN;
+				break;
 			}
 		}
 		/** Fall through if path_check is successful. */
@@ -8083,7 +8101,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 				ret = fail(bop, M0_ERR(-ENOENT));
 				RECORD_END_TIME(endTime);
 				all_data->get_stats.ACT_dur += endTime - startTime;
-				return ret;
+				bop->bo_op.o_sm.sm_state = ret;
+				break;
 			} else { /** bop->bo_flags & BOF_SLANT */
 				if (lev->l_idx < count)
 					bnode_rec(&s);
@@ -8096,7 +8115,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 						ret = fail(bop, rc);
 						RECORD_END_TIME(endTime);
 						all_data->get_stats.ACT_dur += endTime - startTime;
-						return ret;
+						bop->bo_op.o_sm.sm_state = ret;
+						break;
 					}
 				}
 			}
@@ -8112,7 +8132,8 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 				ret = fail(bop, M0_ERR(-ENOENT));
 				RECORD_END_TIME(endTime);
 				all_data->get_stats.ACT_dur += endTime - startTime;
-				return ret;
+				bop->bo_op.o_sm.sm_state = ret;
+				break;
 			}
 		}
 
@@ -8127,27 +8148,40 @@ static int64_t btree_get_kv_tick(struct m0_sm_op *smop)
 			ret = fail(bop, rc);
 			RECORD_END_TIME(endTime);
 			all_data->get_stats.ACT_dur += endTime - startTime;
-			return ret;
+			bop->bo_op.o_sm.sm_state = ret;
+			break;
 		}
-		ret = m0_sm_op_sub(&bop->bo_op, P_CLEANUP, P_FINI);
+		// ret = m0_sm_op_sub(&bop->bo_op, P_CLEANUP, P_FINI);
+		sub_cleanup_fini = 1;
+		ret = P_CLEANUP;
 		RECORD_END_TIME(endTime);
 		all_data->get_stats.ACT_dur += endTime - startTime;
-		return ret;
+		bop->bo_op.o_sm.sm_state = ret;
+		break;
 	}
 	case P_CLEANUP:
 		RECORD_START_TIME(startTime);
 		level_cleanup(oi, bop->bo_tx);
-		ret = m0_sm_op_ret(&bop->bo_op);
+		// ret = m0_sm_op_ret(&bop->bo_op);
+		if ( sub_cleanup_fini == 1) {
+			sub_cleanup_fini = 0;
+			ret = P_FINI;
+		}
+
 		RECORD_END_TIME(endTime);
 		all_data->get_stats.CLEANUP_dur += endTime - startTime;
-		return ret;
+		bop->bo_op.o_sm.sm_state = ret;
+		break;
 	case P_FINI :
 		M0_ASSERT(oi);
 		m0_free(oi);
-		return P_DONE;
+		bop->bo_op.o_sm.sm_state = P_DONE;
+		break;
 	default:
 		M0_IMPOSSIBLE("Wrong state: %i", bop->bo_op.o_sm.sm_state);
 	};
+} while(bop->bo_op.o_sm.sm_state != 2);
+return 0;
 }
 
 /** Iterator state machine. */
@@ -9445,7 +9479,7 @@ M0_INTERNAL void m0_btree_destroy(struct m0_btree *arbor,
 		      &btree_conf, &bop->bo_sm_group);
 }
 
-M0_INTERNAL void m0_btree_get(struct m0_btree *arbor,
+M0_INTERNAL int m0_btree_get(struct m0_btree *arbor,
 			      const struct m0_btree_key *key,
 			      const struct m0_btree_cb *cb, uint64_t flags,
 			      struct m0_btree_op *bop)
@@ -9458,8 +9492,10 @@ M0_INTERNAL void m0_btree_get(struct m0_btree *arbor,
 	bop->bo_tx        = NULL;
 	bop->bo_seg       = NULL;
 	bop->bo_i         = NULL;
-	m0_sm_op_init(&bop->bo_op, &btree_get_kv_tick, &bop->bo_op_exec,
-		      &btree_conf, &bop->bo_sm_group);
+	// m0_sm_op_init(&bop->bo_op, &btree_get_kv_tick, &bop->bo_op_exec,
+	// 	      &btree_conf, &bop->bo_sm_group);
+	btree_get_kv_tick(&bop->bo_op);
+	return 0;
 }
 
 M0_INTERNAL void m0_btree_iter(struct m0_btree *arbor,
@@ -9634,9 +9670,7 @@ M0_INTERNAL int m0_btree_cursor_get(struct m0_btree_cursor     *it,
 
 	cursor_cb.c_act   = btree_cursor_kv_get_cb;
 	cursor_cb.c_datum = it;
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_get(it->bc_arbor, key,
-						   &cursor_cb, flags, &kv_op));
+	rc =  m0_btree_get(it->bc_arbor, key, &cursor_cb, flags, &kv_op);
 	return rc;
 }
 
@@ -14003,11 +14037,10 @@ static void btree_ut_perf(bool old_btree)
 		M0_SET0(&gng);
 		RECORD_START_TIME(startTime);
 		if (!old_btree) {
-			rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-						      m0_btree_get(tree,
-								   &key_in_tree,
-								   &ut_cb, BOF_EQUAL,
-								   &kv_op));
+			rc = m0_btree_get(tree,
+					&key_in_tree,
+					&ut_cb, BOF_EQUAL,
+					&kv_op);
 			M0_ASSERT(i == m0_byteorder_be64_to_cpu(key));
 		} else {
 			rc = M0_BE_OP_SYNC_RET_WITH(&op,
@@ -14091,7 +14124,7 @@ static void btree_ut_perf(bool old_btree)
 		m0_be_btree_init(be_tree, seg, &be_btree_ops);
 		m0_be_btree_delete_credit(be_tree, 1, ksize, vsize, &cred);
 	}
-
+	memset(&kv_op, 0 ,sizeof(struct m0_btree_op));
 	kv_op.all_data = &all_data;
 	i = iter_start = 1;
 	total_records = rec_count;
