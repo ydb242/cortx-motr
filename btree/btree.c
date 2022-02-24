@@ -10041,7 +10041,8 @@ static int ut_btree_kv_get_cb(struct m0_btree_cb *cb, struct m0_btree_rec *rec)
 	m0_bcount_t              vsize;
 	struct ut_cb_data       *datum = cb->c_datum;
 	int                      i      = 0;
-
+	void *source;
+	void *dest;
 	/** The caller can look at these flags if he needs to. */
 	datum->flags = rec->r_flags;
 
@@ -10074,13 +10075,22 @@ static int ut_btree_kv_get_cb(struct m0_btree_cb *cb, struct m0_btree_rec *rec)
 	}
 
 	/** Copy Key and Value from the btree node to the caller's data space */
-	m0_bufvec_cursor_init(&dcur, &datum->key->k_data);
-	m0_bufvec_cursor_init(&scur, &rec->r_key.k_data);
-	m0_bufvec_cursor_copy(&dcur, &scur, ksize);
+	// m0_bufvec_cursor_init(&dcur, &datum->key->k_data);
+	// m0_bufvec_cursor_init(&scur, &rec->r_key.k_data);
+	// m0_bufvec_cursor_copy(&dcur, &scur, ksize);
+	source = rec->r_key.k_data.ov_buf[0];
+	dest = datum->key->k_data.ov_buf[0];
+	*(uint64_t *)dest = *(uint64_t *)source;
 
-	m0_bufvec_cursor_init(&dcur, datum->value);
-	m0_bufvec_cursor_init(&scur, &rec->r_val);
-	m0_bufvec_cursor_copy(&dcur, &scur, vsize);
+	// m0_bufvec_cursor_init(&dcur, datum->value);
+	// m0_bufvec_cursor_init(&scur, &rec->r_val);
+	// m0_bufvec_cursor_copy(&dcur, &scur, vsize);
+	source = rec->r_val.ov_buf[0];
+	dest = datum->value->ov_buf[0];
+	*(uint64_t *)dest = *(uint64_t *)source;
+	source = (uint64_t*)source + 1;
+	dest = (uint64_t*)dest + 1;
+	*(uint64_t *)dest = *(uint64_t *)source;
 
 	if (datum->check_value) {
 		struct m0_bufvec_cursor kcur;
