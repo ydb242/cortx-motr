@@ -103,9 +103,7 @@ static inline int btree_lookup_sync(struct m0_btree     *tree,
 				       .c_datum = &rec,
 				      };
 
-	return M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-					m0_btree_get(tree, &rec.r_key, &get_cb,
-						     flags, &kv_op));
+	return m0_btree_get(tree, &rec.r_key, &get_cb, flags, &kv_op);
 }
 
 static int btree_insert_callback(struct m0_btree_cb  *cb,

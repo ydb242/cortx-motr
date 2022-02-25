@@ -402,9 +402,8 @@ M0_INTERNAL int m0_ctg_meta_find_ctg(struct m0_cas_ctg    *meta,
 	ksize = key.b_nob;
 	rec.r_key.k_data = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_get(meta->cc_tree, &rec.r_key,
-						   &get_cb, BOF_EQUAL, &kv_op));
+	rc = m0_btree_get(meta->cc_tree, &rec.r_key, &get_cb, BOF_EQUAL,
+			  &kv_op);
 	return M0_RC(rc);
 }
 
@@ -1218,17 +1217,12 @@ static int ctg_op_exec(struct m0_ctg_op *ctg_op, int next_phase)
 		m0_be_op_active(beop);
 		rec.r_key.k_data = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
 
-		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-					      m0_btree_get(btree, &rec.r_key,
-							   &cb, BOF_EQUAL,
-							   &kv_op));
+		rc = m0_btree_get(btree, &rec.r_key, &cb, BOF_EQUAL, &kv_op);
 		m0_be_op_done(beop);
 		break;
 	case CTG_OP_COMBINE(CO_MIN, CT_BTREE):
 		m0_be_op_active(beop);
-		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-					      m0_btree_minkey(btree, &cb, 0,
-							      &kv_op));
+		rc =  m0_btree_minkey(btree, &cb, 0, &kv_op);
 		m0_be_op_done(beop);
 		break;
 	case CTG_OP_COMBINE(CO_TRUNC, CT_BTREE):
@@ -1966,9 +1960,8 @@ M0_INTERNAL int m0_ctg_ctidx_lookup_sync(const struct m0_fid  *fid,
 
 	rec.r_key.k_data = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_get(ctidx->cc_tree, &rec.r_key,
-						   &get_cb, BOF_EQUAL, &kv_op));
+	rc = m0_btree_get(ctidx->cc_tree, &rec.r_key, &get_cb, BOF_EQUAL,
+			  &kv_op);
 
 	return M0_RC(rc);
 }

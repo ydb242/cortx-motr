@@ -989,10 +989,7 @@ static int cob_table_lookup(struct m0_btree *tree, struct m0_buf *key,
 					  .c_datum = &rec,
 					 };
 
-	return M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-					m0_btree_get(tree, &rec.r_key,
-						     &lookup_cb,
-						     BOF_EQUAL, &kv_op));
+	return m0_btree_get(tree, &rec.r_key, &lookup_cb, BOF_EQUAL, &kv_op);
 }
 
 
@@ -1229,9 +1226,7 @@ static int cob_oi_lookup(struct m0_cob *cob)
 		cob->co_flags &= ~M0_CA_NSKEY_FREE;
 	}
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_get(tree, &key, &oi_lookup_cb,
-						   BOF_SLANT, &kv_op));
+	rc = m0_btree_get(tree, &key, &oi_lookup_cb, BOF_SLANT, &kv_op);
 
 	return M0_RC(rc);
 }
@@ -1480,10 +1475,7 @@ M0_INTERNAL int m0_cob_iterator_get(struct m0_cob_iterator *it)
 
 	M0_COB_NSKEY_LOG(ENTRY, "[%lx:%lx]/%.*s", it->ci_key);
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_get(tree, &find_key,
-						   &iterator_cb, BOF_SLANT,
-						   &kv_op));
+	rc = m0_btree_get(tree, &find_key,&iterator_cb, BOF_SLANT, &kv_op);
 
 	M0_COB_NSKEY_LOG(LEAVE, "[%lx:%lx]/%.*s rc: %d", it->ci_key, rc);
 	return M0_RC(rc);
@@ -1582,10 +1574,7 @@ M0_INTERNAL int m0_cob_ea_iterator_get(struct m0_cob_ea_iterator *it)
 		.c_datum = it,
 	};
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_get(tree, &find_key,
-						   &ea_iterator_cb, BOF_SLANT,
-						   &kv_op));
+	rc = m0_btree_get(tree, &find_key, &ea_iterator_cb, BOF_SLANT, &kv_op);
 	return M0_RC(rc);
 }
 
@@ -1658,10 +1647,8 @@ M0_INTERNAL int m0_cob_alloc_omgid(struct m0_cob_domain *dom, uint64_t *omgid)
 	 */
 	omgkey.cok_omgid = ~0ULL;
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_get(tree, &find_key, NULL,
-						   BOF_SLANT, &kv_op));
-
+	rc = m0_btree_get(tree, &find_key, NULL, BOF_SLANT, &kv_op);
+	// memset(&kv_op.bo_op, 0 ,sizeof(struct m0_sm_op));
 	/*
 	 * In case of error, most probably due to no terminator record found,
 	 * one needs to run mkfs.
