@@ -1305,9 +1305,7 @@ static int emap_it_get(struct m0_be_emap_cursor *it)
 		.c_datum = it,
 	};
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_get(btree, &r_key, &cb,
-						   BOF_SLANT, &kv_op));
+	rc = m0_btree_get(btree, &r_key, &cb, BOF_SLANT, &kv_op);
 	rc = emap_it_open(it, rc);
 	return rc;
 }

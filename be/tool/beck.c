@@ -2529,10 +2529,8 @@ static int ctg_pver_fid_get(struct m0_fid *fid)
 		v_ptr = val.b_addr;
 		vsize = val.b_nob;
 
-		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-					m0_btree_get(btree,
-						     &rec.r_key, &get_cb,
-						     BOF_EQUAL, &kv_op));
+		rc = m0_btree_get(btree, &rec.r_key, &get_cb, BOF_EQUAL,
+				  &kv_op);
 		if (rc == 0)
 			break;
 	}

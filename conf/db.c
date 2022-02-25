@@ -511,8 +511,7 @@ static int __confdb_free(struct m0_btree *btree, struct m0_be_seg *seg,
 		.c_datum  = &alloc,
 	};
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_minkey(btree, &cb, 0, &kv_op));
+	rc = m0_btree_minkey(btree, &cb, 0, &kv_op);
 	if (rc == 0)
 		/**
 		 * Release pre-allocated BE segment memory from the allocator.
@@ -589,8 +588,7 @@ static int confdb_objs_count(struct m0_btree *btree, size_t *result)
 	M0_ENTRY();
 	*result = 0;
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_minkey(btree, &cb, 0, &kv_op));
+	rc = m0_btree_minkey(btree, &cb, 0, &kv_op);
 	while (rc == 0) {
 		++*result;
 		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
@@ -682,8 +680,7 @@ static void confx_fill(struct m0_confx *dest, struct m0_btree *btree)
 	M0_ENTRY();
 	M0_PRE(dest->cx_nr > 0);
 
-	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
-				      m0_btree_minkey(btree, &cb, 0, &kv_op));
+	rc = m0_btree_minkey(btree, &cb, 0, &kv_op);
 	while (rc == 0) {
 		i++;
 		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,

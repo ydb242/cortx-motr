@@ -349,7 +349,7 @@ M0_INTERNAL void m0_btree_destroy(struct m0_btree *arbor,
  * @param flags Operation specific flags (cookie, slant etc.).
  * @param bop   Btree operation related parameters.
  */
-M0_INTERNAL void m0_btree_get(struct m0_btree *arbor,
+M0_INTERNAL int64_t m0_btree_get(struct m0_btree *arbor,
 			      const struct m0_btree_key *key,
 			      const struct m0_btree_cb *cb, uint64_t flags,
 			      struct m0_btree_op *bop);
@@ -434,7 +434,7 @@ M0_INTERNAL void m0_btree_iter(struct m0_btree *arbor,
  * @param flags Operation specific flags (cookie, lockall etc.).
  * @param bop   Btree operation related parameters.
  */
-M0_INTERNAL void m0_btree_minkey(struct m0_btree *arbor,
+M0_INTERNAL int64_t m0_btree_minkey(struct m0_btree *arbor,
 				 const struct m0_btree_cb *cb, uint64_t flags,
 				 struct m0_btree_op *bop);
 
@@ -446,7 +446,7 @@ M0_INTERNAL void m0_btree_minkey(struct m0_btree *arbor,
  * @param flags Operation specific flags (cookie, lockall etc.).
  * @param bop   Btree operation related parameters.
  */
-M0_INTERNAL void m0_btree_maxkey(struct m0_btree *arbor,
+M0_INTERNAL int64_t m0_btree_maxkey(struct m0_btree *arbor,
 				 const struct m0_btree_cb *cb, uint64_t flags,
 				 struct m0_btree_op *bop);
 
