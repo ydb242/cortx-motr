@@ -1441,7 +1441,7 @@ static int ctg_op_exec_normal(struct m0_ctg_op *ctg_op, int next_phase)
 		m0_be_op_done(beop);
 		break;
 	}
-	ctg_op->co_rc = rc;
+	ctg_op->co_rc = rc == 0 ? rc : M0_ERR(rc);
 	return M0_RC(ctg_op_tick_ret(ctg_op, next_phase));
 }
 
