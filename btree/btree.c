@@ -2276,8 +2276,10 @@ static void bnode_put(struct node_op *op, struct nd *node)
 	bnode_unlock(node);
 	m0_rwlock_write_unlock(&list_lock);
 #ifndef __KERNEL__
-	if (purge_check)
+	if (purge_check) {
 		m0_btree_lrulist_purge_check(M0_PU_BTREE, 0);
+		M0_LOG(M0_ALWAYS, "YDB:Used space=%"PRIu64" ", lru_space_used);
+	}
 #endif
 }
 
