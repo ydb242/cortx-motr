@@ -424,6 +424,23 @@ def update_motr_hare_keys(self, nodes):
         md_disks_lists = get_md_disks_lists(self, node_info)
         update_to_file(self, self._index_motr_hare, self._url_motr_hare, machine_id, md_disks_lists)
 
+def update_btree_watermarks(self):
+    wm_low  = 11
+    wm_targ = 22
+    wm_high = 33
+
+    self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_LOW to {wm_low}\n")
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_LOW/s/.*/MOTR_M0D_BTREE_LRU_WM_LOW={wm_low}/" {MOTR_SYS_CFG}'
+    execute_command(self, cmd)
+
+    self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_TARGET to {wm_targ}\n")
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_TARGET/s/.*/MOTR_M0D_BTREE_LRU_WM_TARGET={wm_targ}/" {MOTR_SYS_CFG}'
+    execute_command(self, cmd)
+
+    self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_HIGH to {wm_high}\n")
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_HIGH/s/.*/MOTR_M0D_BTREE_LRU_WM_HIGH={wm_high}/" {MOTR_SYS_CFG}'
+    execute_command(self, cmd)
+
 def motr_config_k8(self):
     if not verify_libfabric(self):
         raise MotrError(errno.EINVAL, "libfabric is not up.")
@@ -448,6 +465,9 @@ def motr_config_k8(self):
 
     # Modify motr config file
     update_copy_motr_config_file(self)
+
+    # Modify the btree watermarks on the basis of the memory availability
+    update_btree_watermarks(self)
     return
 
 def motr_config(self):
