@@ -425,10 +425,14 @@ def update_motr_hare_keys(self, nodes):
         update_to_file(self, self._index_motr_hare, self._url_motr_hare, machine_id, md_disks_lists)
 
 def update_btree_watermarks(self):
-    wm_low  = 11
-    wm_targ = 22
-    wm_high = 33
+    limits1 = Conf.get(self._index, 'cortx>motr>limits')
+    total_mem = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+    per_mem = total_mem/100
+    wm_low  = per_mem * 2
+    wm_targ = per_mem * 3
+    wm_high = per_mem * 4
 
+    self.logger.info(f"Limits {limits1}\n")
     self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_LOW to {wm_low}\n")
     cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_LOW/s/.*/MOTR_M0D_BTREE_LRU_WM_LOW={wm_low}/" {MOTR_SYS_CFG}'
     execute_command(self, cmd)
