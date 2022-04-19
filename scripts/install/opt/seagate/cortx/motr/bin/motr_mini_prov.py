@@ -514,6 +514,27 @@ def update_motr_hare_keys(self, nodes):
         md_disks_lists = get_md_disks_lists(self, node_info)
         update_to_file(self, self._index_motr_hare, self._url_motr_hare, machine_id, md_disks_lists)
 
+def update_btree_watermarks(self):
+    limits1 = Conf.get(self._index, 'cortx>motr>limits')
+    total_mem = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+    per_mem = total_mem/100
+    wm_low  = per_mem * 2
+    wm_targ = per_mem * 3
+    wm_high = per_mem * 4
+
+    self.logger.info(f"Limits {limits1}\n")
+    self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_LOW to {wm_low}\n")
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_LOW/s/.*/MOTR_M0D_BTREE_LRU_WM_LOW={wm_low}/" {MOTR_SYS_CFG}'
+    execute_command(self, cmd)
+
+    self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_TARGET to {wm_targ}\n")
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_TARGET/s/.*/MOTR_M0D_BTREE_LRU_WM_TARGET={wm_targ}/" {MOTR_SYS_CFG}'
+    execute_command(self, cmd)
+
+    self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_HIGH to {wm_high}\n")
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_HIGH/s/.*/MOTR_M0D_BTREE_LRU_WM_HIGH={wm_high}/" {MOTR_SYS_CFG}'
+    execute_command(self, cmd)
+
 def motr_config_k8(self):
     if not verify_libfabric(self):
         raise MotrError(errno.EINVAL, "libfabric is not up.")
@@ -538,6 +559,9 @@ def motr_config_k8(self):
 
     # Modify motr config file
     update_copy_motr_config_file(self)
+
+    # Modify the btree watermarks on the basis of the memory availability
+    update_btree_watermarks(self)
     return
 
 def motr_config(self):
