@@ -68,9 +68,6 @@ class Cmd:
         # Default setup size is small
         set_setup_size(self, self._services)
 
-        # Modify the btree watermarks on the basis of the memory availability
-        update_btree_watermarks(self)
-
         # Fetch important data from Confstore
         self.cortx = get_value(self, 'cortx', dict)
         self.cluster = get_value(self, 'cluster', dict)

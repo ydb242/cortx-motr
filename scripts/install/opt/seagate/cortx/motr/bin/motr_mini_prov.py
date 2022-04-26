@@ -515,23 +515,35 @@ def update_motr_hare_keys(self, nodes):
         update_to_file(self, self._index_motr_hare, self._url_motr_hare, machine_id, md_disks_lists)
 
 def update_btree_watermarks(self):
-    limits1 = Conf.get(self._index, 'cortx>motr>limits')
-    total_mem = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+    services_limits = Conf.get(self._index, 'cortx>motr>limits')['services']
     try:
-        cvg_cnt = self.server_node['storage'][CVG_COUNT_KEY]
+        cvg = self.storage['cvg']
+        cvg_cnt = len(cvg)
     except:
-        raise MotrError(errno.EINVAL, "cvg_cnt not found\n")
+        raise MotrError(errno.EINVAL, "cvg not found\n")
+    # Check if cvg type is list
+    check_type(cvg, list, "cvg")
+    max_mem_limit_for_ios = 0
+    min_mem_limit_for_ios = 0
 
-    check_type(cvg_cnt, str, CVG_COUNT_KEY)
+    for arr_elem in services_limits:
+        if arr_elem['name'] == "ios":
+            min = arr_elem['memory']['min']
+            if min.isnumeric():
+                min_mem_limit_for_ios = int(min)
+            else:
+                min_mem_limit_for_ios = calc_size(self, min)
 
-    per_mem = total_mem/100
-    per_io_mem = per_mem/cvg_cnt
-    wm_low  = per_io_mem * 2
-    wm_targ = per_io_mem * 3
-    wm_high = per_io_mem * 4
+            max = arr_elem['memory']['max']
+            if max.isnumeric():
+                max_mem_limit_for_ios = int(max)
+            else:
+                max_mem_limit_for_ios = calc_size(self, max)
 
-    self.logger.info(f"Limits {limits1}\n")
-    self.logger.info(f"cvg count {cvg_cnt}\n")
+    wm_low  = min_mem_limit_for_ios
+    wm_targ = int(max_mem_limit_for_ios * 0.60)
+    wm_high = int(max_mem_limit_for_ios * 0.85)
+
     self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_LOW to {wm_low}\n")
     cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_LOW/s/.*/MOTR_M0D_BTREE_LRU_WM_LOW={wm_low}/" {MOTR_SYS_CFG}'
     execute_command(self, cmd)
@@ -569,6 +581,8 @@ def motr_config_k8(self):
     # Modify motr config file
     update_copy_motr_config_file(self)
 
+    # Modify the btree watermarks on the basis of the memory availability
+    update_btree_watermarks(self)
     return
 
 def motr_config(self):
