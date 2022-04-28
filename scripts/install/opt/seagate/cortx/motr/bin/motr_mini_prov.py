@@ -591,8 +591,6 @@ def motr_config_k8(self):
     # Modify motr config file
     update_copy_motr_config_file(self)
 
-    # Modify the btree watermarks on the basis of the memory availability
-    update_btree_watermarks(self)
     return
 
 def motr_config(self):
