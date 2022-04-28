@@ -46,6 +46,7 @@ LOGDIR = "/var/log/seagate/motr"
 LOGGER = "mini_provisioner"
 IVT_DIR = "/var/log/seagate/motr/ivt"
 MOTR_LOG_DIR = "/var/motr"
+MOTR_OVERRIDE_CONF = "./opt/seagate/cortx/motr/conf/motr.conf"
 TIMEOUT_SECS = 120
 MACHINE_ID_LEN = 32
 MOTR_LOG_DIRS = [LOGDIR, MOTR_LOG_DIR]
@@ -548,12 +549,21 @@ def update_btree_watermarks(self):
     cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_LOW/s/.*/MOTR_M0D_BTREE_LRU_WM_LOW={wm_low}/" {MOTR_SYS_CFG}'
     execute_command(self, cmd)
 
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_LOW/s/.*/MOTR_M0D_BTREE_LRU_WM_LOW={wm_low}/" {MOTR_OVERRIDE_CONF}'
+    execute_command(self, cmd)
+
     self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_TARGET to {wm_targ}\n")
     cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_TARGET/s/.*/MOTR_M0D_BTREE_LRU_WM_TARGET={wm_targ}/" {MOTR_SYS_CFG}'
     execute_command(self, cmd)
 
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_TARGET/s/.*/MOTR_M0D_BTREE_LRU_WM_TARGET={wm_targ}/" {MOTR_OVERRIDE_CONF}'
+    execute_command(self, cmd)
+
     self.logger.info(f"setting MOTR_M0D_BTREE_LRU_WM_HIGH to {wm_high}\n")
     cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_HIGH/s/.*/MOTR_M0D_BTREE_LRU_WM_HIGH={wm_high}/" {MOTR_SYS_CFG}'
+    execute_command(self, cmd)
+
+    cmd = f'sed -i "/MOTR_M0D_BTREE_LRU_WM_HIGH/s/.*/MOTR_M0D_BTREE_LRU_WM_HIGH={wm_high}/" {MOTR_OVERRIDE_CONF}'
     execute_command(self, cmd)
 
 def motr_config_k8(self):
