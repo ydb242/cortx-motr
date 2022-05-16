@@ -101,15 +101,15 @@ enum m0_btree_crc_type {
 	M0_BCT_BTREE_ENC_RAW_HASH,
 };
 
+enum m0_btree_addr_type {
+	EMBEDDED_RECORD = 0,
+	EMBEDDED_INDIRECT,
+};
+
 struct m0_btree_type {
 	enum m0_btree_types tt_id;
 	int ksize;
 	int vsize;
-};
-
-enum m0_btree_addr_type {
-	EMBEDDED_RECORD = 0,
-	EMBEDDED_INDIRECT,
 };
 
 struct m0_bcookie {
