@@ -4952,7 +4952,7 @@ static int vkvv_dir_free_idx_get(const struct nd *node,
 				 int *shift)
 {
 	struct vkvv_head    *h               = vkvv_data(node);
-	struct vkvv_dir_rec  dir             = vkvv_dir_get(node);
+	struct vkvv_dir_rec  *dir            = vkvv_dir_get(node);
 
 	uint32_t             req_ksize       =
 				m0_vec_count(&rec->r_key.k_data.ov_vec);
