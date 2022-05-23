@@ -1301,6 +1301,8 @@ M0_INTERNAL int m0_balloc_load_extents(struct m0_balloc *cb,
 	m0_bcount_t             i;
 	int		        rc = 0;
 
+	M0_ALWAYS("enter into m0_balloc_load_extents");
+
 	M0_ENTRY("grp=%d non-spare-frags=%d spare-frags=%d",
 		 (int)grp->bgi_groupno, (int)group_fragments_get(grp),
 		 (int)group_spare_fragments_get(grp));
