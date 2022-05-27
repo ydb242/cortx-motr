@@ -967,6 +967,10 @@ struct node_type {
 	 */
 	bool (*nt_isfit)(struct slot *slot);
 
+	bool (*nt_compaction_check)(struct slot *slot);
+
+	void (*nt_compaction)(struct slot *slot);
+
 	/**
 	 *  Node changes related to last record have completed; any post
 	 *  processing related to the record needs to be done in this function.
@@ -1239,6 +1243,8 @@ static void bnode_rec  (struct slot *slot);
 static void bnode_key  (struct slot *slot);
 static void bnode_child(struct slot *slot, struct segaddr *addr);
 static bool bnode_isfit(struct slot *slot);
+static bool bnode_compaction_check(struct slot *slot);
+static void bnode_compaction(struct slot *slot);
 static void bnode_done(struct slot *slot, bool modified);
 static void bnode_make(struct slot *slot);
 static bool bnode_newval_isfit(struct slot *slot, struct m0_btree_rec *old_rec,
@@ -1660,6 +1666,18 @@ static bool bnode_isfit(struct slot *slot)
 {
 	M0_PRE(bnode_invariant(slot->s_node));
 	return slot->s_node->n_type->nt_isfit(slot);
+}
+
+static bool bnode_compaction_check(struct slot *slot)
+{
+	M0_PRE(bnode_invariant(slot->s_node));
+	return slot->s_node->n_type->nt_compaction_check(slot);
+}
+
+static void bnode_compaction(struct slot *slot)
+{
+	M0_PRE(bnode_invariant(slot->s_node));
+	return slot->s_node->n_type->nt_compaction(slot);
 }
 
 static void bnode_done(struct slot *slot, bool modified)
@@ -2525,6 +2543,8 @@ static const struct node_type fixed_format = {
 	.nt_key                       = ff_node_key,
 	.nt_child                     = ff_child,
 	.nt_isfit                     = ff_isfit,
+	.nt_compaction_check          = NULL,
+	.nt_compaction                = NULL,
 	.nt_done                      = ff_done,
 	.nt_make                      = ff_make,
 	.nt_newval_isfit              = ff_newval_isfit,
@@ -3663,6 +3683,8 @@ static const struct node_type fixed_ksize_variable_vsize_format = {
 	.nt_key                       = fkvv_node_key,
 	.nt_child                     = fkvv_child,
 	.nt_isfit                     = fkvv_isfit,
+	.nt_compaction_check          = NULL,
+	.nt_compaction                = NULL,
 	.nt_done                      = fkvv_done,
 	.nt_make                      = fkvv_make,
 	.nt_newval_isfit              = fkvv_newval_isfit,
@@ -5114,6 +5136,8 @@ static void vkvv_rec(struct slot *slot);
 static void vkvv_node_key(struct slot *slot);
 static void vkvv_child(struct slot *slot, struct segaddr *addr);
 static bool vkvv_isfit(struct slot *slot);
+static bool vkvv_compaction_check(struct slot *slot);
+static void vkvv_compaction(struct slot *slot);
 static void vkvv_done(struct slot *slot, bool modified);
 static void vkvv_make(struct slot *slot);
 static bool vkvv_newval_isfit(struct slot *slot, struct m0_btree_rec *old_rec,
@@ -5168,6 +5192,8 @@ static const struct node_type variable_kv_format = {
 	.nt_key                       = vkvv_node_key,
 	.nt_child                     = vkvv_child,
 	.nt_isfit                     = vkvv_isfit,
+	.nt_compaction_check          = vkvv_compaction_check,
+	.nt_compaction                = vkvv_compaction,
 	.nt_done                      = vkvv_done,
 	.nt_make                      = vkvv_make,
 	.nt_newval_isfit              = vkvv_newval_isfit,
@@ -5671,7 +5697,7 @@ static uint32_t vkvv_rec_val_size(const struct nd *node, int idx)
 	if (IS_EMBEDDED_INDIRECT(node)) {
 		struct vkvv_dir_rec *dir   = vkvv_dir_get(node);
 		vsize = dir[idx].val_size;
-		if (fkvv_crctype_get(node) == M0_BCT_BTREE_ENC_RAW_HASH)
+		if (vkvv_crctype_get(node) == M0_BCT_BTREE_ENC_RAW_HASH)
 			vsize -= CRC_VALUE_SIZE;
 		M0_ASSERT(vsize > 0);
 		return vsize;
@@ -5806,8 +5832,9 @@ static void vkvv_rec(struct slot *slot)
 {
 	struct vkvv_head *h = vkvv_data(slot->s_node);
 
-	M0_PRE(ergo(!(h->vkvv_used == 0 && slot->s_idx == 0),
-		    slot->s_idx <= h->vkvv_used));
+	// M0_PRE(ergo(!(h->vkvv_used == 0 && slot->s_idx == 0),
+	// 	    slot->s_idx <= h->vkvv_used));
+	M0_PRE(h->vkvv_used > 0 && slot->s_idx < h->vkvv_used);
 
 	slot->s_rec.r_val.ov_vec.v_nr = 1;
 	slot->s_rec.r_val.ov_vec.v_count[0] =
@@ -5909,6 +5936,257 @@ static bool vkvv_isfit(struct slot *slot)
 	return ksize + vsize + dir_entry <= vkvv_space(slot->s_node);
 }
 
+static void vkvv_dir_entry_delete(const struct nd *node, int idx)
+{
+	struct vkvv_head    *h   = vkvv_data(node);
+	struct vkvv_dir_rec *dir = vkvv_dir_get(node);
+	int                  total_size;
+
+	total_size = sizeof(*dir) * (h->vkvv_dir_entries - idx - 1);
+
+	m0_memmove(&dir[idx], &dir[idx + 1], total_size);
+	h->vkvv_dir_entries--;
+
+	/**
+	 * Increase the size of last free fragment of value (i.e.fragment
+	 * beetween directory and last valid value).
+	 */
+	dir[h->vkvv_dir_entries - 1].val_offset     -= sizeof(*dir);
+	dir[h->vkvv_dir_entries - 1].alloc_val_size += sizeof(*dir);
+}
+
+static bool vkvv_compaction_check(struct slot *slot)
+{
+	struct vkvv_head    *h                 = vkvv_data(slot->s_node);
+	struct vkvv_dir_rec *dir               = vkvv_dir_get(slot->s_node);
+	int                  total_avail_ksize = 0;
+	int                  total_avail_vsize = 0;
+	int                  incoming_ksize    =
+				m0_vec_count(&slot->s_rec.r_key.k_data.ov_vec);
+	int                  incoming_vsize    =
+				m0_vec_count(&slot->s_rec.r_val.ov_vec);
+	int                  i;
+
+	for (i = 0; i < h->vkvv_dir_entries; i++) {
+		total_avail_ksize += dir[i].key_size;
+		total_avail_vsize += dir[i].val_size;
+	}
+
+	total_avail_ksize = h->vkvv_nsize - sizeof(*h) - total_avail_ksize;
+	total_avail_vsize = h->vkvv_nsize - h->vkvv_dir_offset -
+			sizeof(*dir) * h->vkvv_dir_entries - total_avail_vsize;
+	if (total_avail_ksize >= incoming_ksize &&
+	    total_avail_vsize >= incoming_vsize)
+		return true;
+	else
+		return false;
+}
+
+static void sort_dir(struct vkvv_dir_rec *dir, int count)
+{
+	int i, j;
+	struct vkvv_dir_rec item;
+	for (i = 1; i < count; i++) {
+		item = dir[i];
+		j = i - 1;
+		while (j >= 0 && dir[i].key_offset > item.key_offset) {
+			dir[j+1] = dir[j];
+			j = j -1;
+		}
+		dir[j+1] = item;
+	}
+}
+
+static bool is_rec_with_hole(struct vkvv_dir_rec entry)
+{
+	if(entry.key_size != 0 && entry.val_size != 0 &&
+	   entry.alloc_key_size - entry.key_size > 0 &&
+	   entry.alloc_val_size - entry.val_size > 0)
+		return true;
+	else
+		return false;
+}
+
+static bool is_rec_without_hole(struct vkvv_dir_rec entry)
+{
+	if(entry.key_size != 0 && entry.val_size != 0 &&
+	   entry.alloc_key_size - entry.key_size == 0 &&
+	   entry.alloc_val_size - entry.val_size == 0)
+		return true;
+	else
+		return false;
+}
+
+static bool is_rec_free_frag(struct vkvv_dir_rec entry)
+{
+	if(entry.key_size == 0 && entry.val_size == 0 &&
+	   entry.alloc_key_size > 0 && entry.alloc_val_size > 0 )
+		return true;
+	else
+		return false;
+}
+
+static int get_idx_of_rec(const struct nd *node, struct vkvv_dir_rec entry)
+{
+	struct vkvv_head    *h   = vkvv_data(node);
+	struct vkvv_dir_rec *dir = vkvv_dir_get(node);
+	int                  i;
+
+	for(i = 0; i < h->vkvv_dir_entries; i++) {
+		if (dir[i].key_offset == entry.key_offset &&
+		    dir[i].val_offset == entry.val_offset)
+			break;
+	}
+	return i;
+}
+
+static void vkvv_compaction(struct slot *slot)
+{
+	struct vkvv_head    *h             = vkvv_data(slot->s_node);
+	struct vkvv_dir_rec *dir           = vkvv_dir_get(slot->s_node);
+	int                  i             = 0;
+	int                  dir_rec_count = h->vkvv_dir_entries;
+	struct vkvv_dir_rec  new_dir[dir_rec_count];
+
+	memcpy(new_dir, dir, sizeof(*dir) * dir_rec_count);
+	sort_dir(new_dir, dir_rec_count);
+
+	while (i < dir_rec_count - 1) {
+		struct vkvv_dir_rec curr_ent = new_dir[i];
+		struct vkvv_dir_rec next_ent = new_dir[i+1];
+
+		if (is_rec_with_hole(curr_ent)) {
+			int curr_khole = curr_ent.alloc_key_size -
+					 curr_ent.key_size;
+			int curr_vhole = curr_ent.alloc_val_size -
+					 curr_ent.val_size;
+			int curr_idx  = get_idx_of_rec(slot->s_node, curr_ent);
+			int next_idx  = get_idx_of_rec(slot->s_node, next_ent);
+
+			if (is_rec_without_hole(next_ent) ||
+			    is_rec_with_hole(next_ent)) {
+				//Key region
+				curr_ent.alloc_key_size -= curr_khole;
+				dir[curr_idx].alloc_key_size -= curr_khole;
+
+				m0_memmove((void *)h + next_ent.key_offset -
+					   curr_khole,
+					   (void *)h + next_ent.key_offset,
+					   next_ent.alloc_key_size);
+				next_ent.key_offset          -= curr_khole;
+				dir[next_idx].key_offset     -= curr_khole;
+				next_ent.alloc_key_size      += curr_khole;
+				dir[next_idx].alloc_key_size += curr_khole;
+
+				//Value region
+				curr_ent.alloc_val_size      -= curr_vhole;
+				dir[curr_idx].alloc_val_size -= curr_vhole;
+
+				m0_memmove((void *)h + curr_ent.val_offset +
+					   curr_vhole,
+					   (void *)h + curr_ent.val_offset,
+					   curr_ent.alloc_val_size);
+
+				curr_ent.val_offset      += curr_vhole;
+				dir[curr_idx].val_offset += curr_vhole;
+
+				next_ent.alloc_val_size      += curr_vhole;
+				dir[next_idx].alloc_val_size += curr_vhole;
+			}
+			if (is_rec_free_frag(next_ent)) {
+				//Key region
+				curr_ent.alloc_key_size      -= curr_khole;
+				dir[curr_idx].alloc_key_size -= curr_khole;
+
+				next_ent.key_offset          -= curr_khole;
+				dir[next_idx].key_offset     -= curr_khole;
+				next_ent.alloc_key_size      += curr_khole;
+				dir[next_idx].alloc_key_size += curr_khole;
+
+				//Value region
+				curr_ent.alloc_val_size      -= curr_vhole;
+				dir[curr_idx].alloc_val_size -= curr_vhole;
+
+				m0_memmove((void *)h + curr_ent.val_offset +
+					   curr_vhole,
+					   (void *)h + curr_ent.val_offset,
+					   curr_ent.alloc_val_size);
+
+				curr_ent.val_offset          += curr_vhole;
+				dir[curr_idx].val_offset     += curr_vhole;
+				next_ent.alloc_val_size      += curr_vhole;
+				dir[next_idx].alloc_val_size += curr_vhole;
+			}
+		} else if (is_rec_without_hole(curr_ent)) {
+			//do not do anything
+		} else if (is_rec_free_frag(curr_ent)) {
+			int ksize_tm = new_dir[dir_rec_count - 1].key_offset -
+				       next_ent.key_offset;
+			int vsize_tm = curr_ent.val_offset -
+				       new_dir[dir_rec_count - 2].val_offset;
+			// sorted dir management && actual dir management
+			int curr_khole = curr_ent.alloc_key_size;
+			int curr_vhole = curr_ent.alloc_val_size;
+			int j, orig_idx, total_size;
+			struct vkvv_dir_rec temp_entry;
+			int curr_idx      = get_idx_of_rec(slot->s_node,
+							   curr_ent);
+			int last_frag_idx =
+				get_idx_of_rec(slot->s_node,
+					       new_dir[dir_rec_count -1]);
+
+			for (j = i + 1; j < dir_rec_count - 1; j++) {
+				temp_entry = new_dir[j];
+				orig_idx   = get_idx_of_rec(slot->s_node,
+							    temp_entry);
+
+				new_dir[j].key_offset    -= curr_khole;
+				dir[orig_idx].key_offset -= curr_khole;
+
+				new_dir[j].val_offset    += curr_vhole;
+				dir[orig_idx].val_offset += curr_vhole;
+			}
+			total_size = sizeof(*dir) * (dir_rec_count - i - 1);
+			m0_memmove(&dir[i], &dir[i + 1], total_size);
+			vkvv_dir_entry_delete(slot->s_node, curr_idx);
+
+			//Key region
+			m0_memmove((void *)h + curr_ent.key_offset,
+				   (void *)h + next_ent.key_offset,
+				   ksize_tm);
+			new_dir[dir_rec_count-1].key_offset     -=
+							curr_ent.alloc_key_size;
+			new_dir[dir_rec_count-1].alloc_key_size +=
+							curr_ent.alloc_key_size;
+			dir[last_frag_idx].key_offset     -=
+							curr_ent.alloc_key_size;
+			dir[last_frag_idx].alloc_key_size +=
+							curr_ent.alloc_key_size;
+
+			//Value region
+			m0_memmove((void *)h +
+				   new_dir[dir_rec_count - 2].val_offset,
+				   (void *)h +
+				   new_dir[dir_rec_count - 2].val_offset +
+				   curr_ent.alloc_val_size,
+				   vsize_tm);
+
+			new_dir[dir_rec_count-1].alloc_val_size +=
+							curr_ent.alloc_val_size;
+			dir[last_frag_idx].alloc_val_size       +=
+							curr_ent.alloc_val_size;
+
+			dir_rec_count--;
+			h->vkvv_dir_entries--;
+		} else {
+			M0_LOG(M0_ERROR, "Unexpected area for compaction.."
+					  "doing nothing");
+		}
+		i++;
+	}
+
+}
+
 static void vkvv_done(struct slot *slot, bool modified)
 {
 	/**
@@ -5924,9 +6202,9 @@ static void vkvv_done(struct slot *slot, bool modified)
 	if (modified && h->vkvv_level == 0 &&
 	    vkvv_crctype_get(node) == M0_BCT_BTREE_ENC_RAW_HASH) {
 		if (IS_EMBEDDED_INDIRECT(slot->s_node))
-			val_addr        = vkvv_val(slot->s_node, slot->s_idx);
+			val_addr = vkvv_val(slot->s_node, slot->s_idx);
 		else
-			val_addr        = vkvv_val(slot->s_node, slot->s_idx + 1);
+			val_addr = vkvv_val(slot->s_node, slot->s_idx + 1);
 		vsize           = vkvv_rec_val_size(slot->s_node, slot->s_idx);
 		calculated_csum = m0_hash_fnc_fnv1(val_addr, vsize);
 
@@ -6030,37 +6308,20 @@ static void vkvv_dir_entry_make(const struct nd *node, int idx)
 	m0_memmove(&dir[idx + 1], &dir[idx], total_size);
 }
 
-static void vkvv_dir_entry_delete(const struct nd *node, int idx)
-{
-	struct vkvv_head    *h   = vkvv_data(node);
-	struct vkvv_dir_rec *dir = vkvv_dir_get(node);
-	int                  total_size;
-
-	total_size = sizeof(*dir) * (h->vkvv_dir_entries - idx - 1);
-
-	m0_memmove(&dir[idx], &dir[idx + 1], total_size);
-	h->vkvv_dir_entries--;
-
-	/**
-	 * Increase the size of last free fragment of value (i.e.fragment
-	 * beetween directory and last valid value).
-	 */
-	dir[h->vkvv_dir_entries - 1].val_offset     -= sizeof(*dir);
-	dir[h->vkvv_dir_entries - 1].alloc_val_size += sizeof(*dir);
-}
 
 static void vkvv_lnode_make_1(struct slot *slot)
 {
-	struct vkvv_head    *h     = vkvv_data(slot->s_node);
-	int                  ksize =
+	struct vkvv_head    *h            = vkvv_data(slot->s_node);
+	int                  ksize        =
 			m0_vec_count(&slot->s_rec.r_key.k_data.ov_vec);
-	int                  vsize = m0_vec_count(&slot->s_rec.r_val.ov_vec);
-	int                  shift = 0;
-	int                  idx   = 0;
+	int                  vsize        =
+			m0_vec_count(&slot->s_rec.r_val.ov_vec);
+	int                  shift        = 0;
+	int                  idx          = 0;
+	int                  total_filled = 0;
 	struct vkvv_dir_rec *dir;
 	struct vkvv_dir_rec  dir_entry;
-	int i;
-	int total_filled = 0;
+	int                  i;
 
 	if (!(IS_INTERNAL_NODE(slot->s_node)) &&
 	    vkvv_crctype_get(slot->s_node) == M0_BCT_BTREE_ENC_RAW_HASH)
@@ -6084,7 +6345,7 @@ static void vkvv_lnode_make_1(struct slot *slot)
 		 */
 		M0_ASSERT(shift == 0);
 
-		dir_entry.val_offset = dir[idx].val_offset;
+		dir_entry.val_offset     = dir[idx].val_offset;
 		dir_entry.alloc_key_size = dir[idx].alloc_key_size;
 		dir_entry.alloc_val_size = dir[idx].alloc_val_size;
 
@@ -6307,11 +6568,15 @@ static void vkvv_make(struct slot *slot)
 static bool vkvv_newval_isfit(struct slot *slot, struct m0_btree_rec *old_rec,
 			      struct m0_btree_rec *new_rec)
 {
+	//struct vkvv_dir_rec   *dir_entry      = vkvv_dir_get(slot->s_node);
 	int new_vsize  = m0_vec_count(&new_rec->r_val.ov_vec);
 	int old_vsize  = m0_vec_count(&old_rec->r_val.ov_vec);
 	int vsize_diff = new_vsize - old_vsize;
 	if (vsize_diff <= 0)
+	// if (vsize_diff <= 0 ||
+	//     dir_entry[slot->s_idx].alloc_val_size >= new_vsize)
 		return true;
+
 	if (IS_EMBEDDED_INDIRECT(slot->s_node))
 		return vkvv_indir_isfit(slot->s_node, new_rec);
 	else
@@ -6341,7 +6606,9 @@ static void vkvv_val_resize(struct slot *slot, int vsize_diff,
 
 	if (IS_EMBEDDED_INDIRECT(slot->s_node)) {
 		struct vkvv_dir_rec *dir = vkvv_dir_get(slot->s_node);
-		if (vsize_diff <= 0)
+		//int new_vsize  = m0_vec_count(&new_rec->r_val.ov_vec);
+		if (vsize_diff <= 0) //||
+		    //dir[slot->s_idx].alloc_val_size >= new_vsize)
 			dir[slot->s_idx].val_size += vsize_diff;
 		else {
 			void        *k_addr;
@@ -6537,6 +6804,8 @@ static void vkvv_lnode_del_1(const struct nd *node, int idx)
 		bytes_to_move = sizeof(dir_ent) * (h->vkvv_used - idx);
 		m0_memmove(&dir[idx], &dir[idx + 1], bytes_to_move);
 		dir[freed_ent] = dir_ent;
+		dir[freed_ent].key_size = 0;
+		dir[freed_ent].val_size = 0;
 	}
 
 	for (i = h->vkvv_used + 1; i < h->vkvv_dir_entries - 1; i++) {
@@ -7972,8 +8241,14 @@ static int64_t btree_put_kv_tick(struct m0_sm_op *smop)
 				   (bop->bo_flags & BOF_INSERT_IF_NOT_FOUND)));
 
 			node_slot.s_rec  = bop->bo_rec;
-			if (!bnode_isfit(&node_slot))
-				return btree_put_makespace_phase(bop);
+//			if (!bnode_isfit(&node_slot))
+//				return btree_put_makespace_phase(bop);
+			if (!bnode_isfit(&node_slot)) {
+				if(!bnode_compaction_check(&node_slot))
+					return btree_put_makespace_phase(bop);
+				else
+					bnode_compaction(&node_slot);
+			}
 
 			bnode_lock(lev->l_node);
 			/**
