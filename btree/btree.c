@@ -5572,16 +5572,20 @@ static int vkvv_dir_free_idx_get(const struct nd *node,
 		/* Check if we can shift directory to left */
 		if (dir[dir_count - 1].alloc_key_size - req_ksize >=
 		    req_vsize + dir_space) {
+		    //(req_vsize + dir_space - dir[dir_count - 1].alloc_val_size)) {
 			if (shift != NULL)
 				*shift = -(req_vsize + dir_space);
+				//*shift = -(req_vsize + dir_space - dir[dir_count - 1].alloc_val_size);
 			out_idx = dir_count - 1;
 		}
 	} else if (dir[dir_count - 1].alloc_val_size >= req_vsize + dir_space) {
 		/* Check if we can shift directory to right */
 		if (dir[dir_count - 1].alloc_val_size -
 		    (req_vsize + dir_space) >= req_ksize) {
+		    //(req_vsize + dir_space) >= (req_ksize - dir[dir_count - 1].alloc_key_size)) {
 			if (shift != NULL)
 				*shift = req_ksize;
+				//*shift = (req_ksize - dir[dir_count - 1].alloc_key_size);
 			out_idx = dir_count - 1;
 		}
 	}
@@ -5968,15 +5972,14 @@ static bool vkvv_compaction_check(struct slot *slot)
 	int                  i;
 
 	for (i = 0; i < h->vkvv_dir_entries; i++) {
-		total_avail_ksize += dir[i].key_size;
-		total_avail_vsize += dir[i].val_size;
+		total_avail_ksize += (dir[i].alloc_key_size - dir[i].key_size);
+		total_avail_vsize += (dir[i].alloc_val_size - dir[i].val_size);
 	}
 
-	total_avail_ksize = h->vkvv_nsize - sizeof(*h) - total_avail_ksize;
-	total_avail_vsize = h->vkvv_nsize - h->vkvv_dir_offset -
-			sizeof(*dir) * h->vkvv_dir_entries - total_avail_vsize;
-	if (total_avail_ksize >= incoming_ksize &&
-	    total_avail_vsize >= incoming_vsize)
+	if (total_avail_ksize + total_avail_vsize >= incoming_ksize +
+	    incoming_vsize + sizeof(*dir))
+	// if (total_avail_ksize >= incoming_ksize &&
+	//     total_avail_vsize >= incoming_vsize + sizeof(*dir))
 		return true;
 	else
 		return false;
@@ -5989,7 +5992,7 @@ static void sort_dir(struct vkvv_dir_rec *dir, int count)
 	for (i = 1; i < count; i++) {
 		item = dir[i];
 		j = i - 1;
-		while (j >= 0 && dir[i].key_offset > item.key_offset) {
+		while (j >= 0 && dir[j].key_offset > item.key_offset) {
 			dir[j+1] = dir[j];
 			j = j -1;
 		}
@@ -6000,8 +6003,8 @@ static void sort_dir(struct vkvv_dir_rec *dir, int count)
 static bool is_rec_with_hole(struct vkvv_dir_rec entry)
 {
 	if(entry.key_size != 0 && entry.val_size != 0 &&
-	   entry.alloc_key_size - entry.key_size > 0 &&
-	   entry.alloc_val_size - entry.val_size > 0)
+	   (entry.alloc_key_size - entry.key_size > 0 ||
+	    entry.alloc_val_size - entry.val_size > 0))
 		return true;
 	else
 		return false;
@@ -6020,7 +6023,7 @@ static bool is_rec_without_hole(struct vkvv_dir_rec entry)
 static bool is_rec_free_frag(struct vkvv_dir_rec entry)
 {
 	if(entry.key_size == 0 && entry.val_size == 0 &&
-	   entry.alloc_key_size > 0 && entry.alloc_val_size > 0 )
+	   (entry.alloc_key_size > 0 || entry.alloc_val_size > 0))
 		return true;
 	else
 		return false;
@@ -6047,6 +6050,8 @@ static void vkvv_compaction(struct slot *slot)
 	int                  i             = 0;
 	int                  dir_rec_count = h->vkvv_dir_entries;
 	struct vkvv_dir_rec  new_dir[dir_rec_count];
+	int c1 = 0;
+	int c2 = 0;
 
 	memcpy(new_dir, dir, sizeof(*dir) * dir_rec_count);
 	sort_dir(new_dir, dir_rec_count);
@@ -6067,6 +6072,7 @@ static void vkvv_compaction(struct slot *slot)
 			    is_rec_with_hole(next_ent)) {
 				//Key region
 				curr_ent.alloc_key_size -= curr_khole;
+				new_dir[i].alloc_key_size -= curr_khole;
 				dir[curr_idx].alloc_key_size -= curr_khole;
 
 				m0_memmove((void *)h + next_ent.key_offset -
@@ -6074,12 +6080,15 @@ static void vkvv_compaction(struct slot *slot)
 					   (void *)h + next_ent.key_offset,
 					   next_ent.alloc_key_size);
 				next_ent.key_offset          -= curr_khole;
+				new_dir[i+1].key_offset      -= curr_khole;
 				dir[next_idx].key_offset     -= curr_khole;
 				next_ent.alloc_key_size      += curr_khole;
+				new_dir[i+1].alloc_key_size  += curr_khole;
 				dir[next_idx].alloc_key_size += curr_khole;
 
 				//Value region
 				curr_ent.alloc_val_size      -= curr_vhole;
+				new_dir[i].alloc_val_size    -= curr_vhole;
 				dir[curr_idx].alloc_val_size -= curr_vhole;
 
 				m0_memmove((void *)h + curr_ent.val_offset +
@@ -6088,23 +6097,29 @@ static void vkvv_compaction(struct slot *slot)
 					   curr_ent.alloc_val_size);
 
 				curr_ent.val_offset      += curr_vhole;
+				new_dir[i].val_offset    += curr_vhole;
 				dir[curr_idx].val_offset += curr_vhole;
 
 				next_ent.alloc_val_size      += curr_vhole;
+				new_dir[i+1].alloc_val_size  += curr_vhole;
 				dir[next_idx].alloc_val_size += curr_vhole;
 			}
 			if (is_rec_free_frag(next_ent)) {
 				//Key region
 				curr_ent.alloc_key_size      -= curr_khole;
+				new_dir[i].alloc_key_size    -= curr_khole;
 				dir[curr_idx].alloc_key_size -= curr_khole;
 
 				next_ent.key_offset          -= curr_khole;
+				new_dir[i+1].key_offset      -= curr_khole;
 				dir[next_idx].key_offset     -= curr_khole;
 				next_ent.alloc_key_size      += curr_khole;
+				new_dir[i+1].alloc_key_size  += curr_khole;
 				dir[next_idx].alloc_key_size += curr_khole;
 
 				//Value region
 				curr_ent.alloc_val_size      -= curr_vhole;
+				new_dir[i].alloc_val_size    -= curr_vhole;
 				dir[curr_idx].alloc_val_size -= curr_vhole;
 
 				m0_memmove((void *)h + curr_ent.val_offset +
@@ -6113,10 +6128,14 @@ static void vkvv_compaction(struct slot *slot)
 					   curr_ent.alloc_val_size);
 
 				curr_ent.val_offset          += curr_vhole;
+				new_dir[i].val_offset        += curr_vhole;
 				dir[curr_idx].val_offset     += curr_vhole;
+
 				next_ent.alloc_val_size      += curr_vhole;
+				new_dir[i+1].alloc_val_size  += curr_vhole;
 				dir[next_idx].alloc_val_size += curr_vhole;
 			}
+			c1++;
 		} else if (is_rec_without_hole(curr_ent)) {
 			//do not do anything
 		} else if (is_rec_free_frag(curr_ent)) {
@@ -6124,6 +6143,8 @@ static void vkvv_compaction(struct slot *slot)
 				       next_ent.key_offset;
 			int vsize_tm = curr_ent.val_offset -
 				       new_dir[dir_rec_count - 2].val_offset;
+			void *start_key_addr = (void *)h + curr_ent.key_offset;
+			void *start_val_addr = (void *)h + curr_ent.val_offset;
 			// sorted dir management && actual dir management
 			int curr_khole = curr_ent.alloc_key_size;
 			int curr_vhole = curr_ent.alloc_val_size;
@@ -6131,9 +6152,6 @@ static void vkvv_compaction(struct slot *slot)
 			struct vkvv_dir_rec temp_entry;
 			int curr_idx      = get_idx_of_rec(slot->s_node,
 							   curr_ent);
-			int last_frag_idx =
-				get_idx_of_rec(slot->s_node,
-					       new_dir[dir_rec_count -1]);
 
 			for (j = i + 1; j < dir_rec_count - 1; j++) {
 				temp_entry = new_dir[j];
@@ -6146,43 +6164,48 @@ static void vkvv_compaction(struct slot *slot)
 				new_dir[j].val_offset    += curr_vhole;
 				dir[orig_idx].val_offset += curr_vhole;
 			}
-			total_size = sizeof(*dir) * (dir_rec_count - i - 1);
-			m0_memmove(&dir[i], &dir[i + 1], total_size);
-			vkvv_dir_entry_delete(slot->s_node, curr_idx);
-
-			//Key region
-			m0_memmove((void *)h + curr_ent.key_offset,
-				   (void *)h + next_ent.key_offset,
-				   ksize_tm);
 			new_dir[dir_rec_count-1].key_offset     -=
-							curr_ent.alloc_key_size;
+							curr_khole;
 			new_dir[dir_rec_count-1].alloc_key_size +=
-							curr_ent.alloc_key_size;
-			dir[last_frag_idx].key_offset     -=
-							curr_ent.alloc_key_size;
-			dir[last_frag_idx].alloc_key_size +=
-							curr_ent.alloc_key_size;
-
-			//Value region
-			m0_memmove((void *)h +
-				   new_dir[dir_rec_count - 2].val_offset,
-				   (void *)h +
-				   new_dir[dir_rec_count - 2].val_offset +
-				   curr_ent.alloc_val_size,
-				   vsize_tm);
+							curr_khole;
+			dir[h->vkvv_dir_entries-1].key_offset     -=
+							curr_khole;
+			dir[h->vkvv_dir_entries-1].alloc_key_size +=
+							curr_khole;
 
 			new_dir[dir_rec_count-1].alloc_val_size +=
-							curr_ent.alloc_val_size;
-			dir[last_frag_idx].alloc_val_size       +=
-							curr_ent.alloc_val_size;
+							curr_vhole;
+			dir[h->vkvv_dir_entries-1].alloc_val_size       +=
+							curr_vhole;
 
+			total_size = sizeof(*new_dir) * (dir_rec_count - i - 1);
+			m0_memmove(&new_dir[i], &new_dir[i + 1], total_size);
 			dir_rec_count--;
+			new_dir[dir_rec_count - 1].val_offset     -= sizeof(*new_dir);
+			new_dir[dir_rec_count - 1].alloc_val_size += sizeof(*new_dir);
+
+			total_size = sizeof(*dir) * (h->vkvv_dir_entries - curr_idx - 1);
+			m0_memmove(&dir[curr_idx], &dir[curr_idx + 1], total_size);
 			h->vkvv_dir_entries--;
+			dir[h->vkvv_dir_entries - 1].val_offset     -= sizeof(*dir);
+			dir[h->vkvv_dir_entries - 1].alloc_val_size += sizeof(*dir);
+			//Key region
+			m0_memmove(start_key_addr,
+				   start_key_addr + curr_khole,
+				   ksize_tm);
+
+			//Value region
+			m0_memmove(start_val_addr - vsize_tm + curr_vhole,
+				   start_val_addr - vsize_tm,
+				   vsize_tm);
+
+			c2++;
 		} else {
 			M0_LOG(M0_ERROR, "Unexpected area for compaction.."
 					  "doing nothing");
 		}
 		i++;
+		M0_LOG(M0_ERROR, "\n c1 = %d c2 = %d", c1, c2);
 	}
 
 }
@@ -6947,6 +6970,41 @@ static void vkvv_capture(struct slot *slot, int cr, struct m0_be_tx *tx)
 	int  *p_dsize = &dsize;
 
 	if (IS_EMBEDDED_INDIRECT(slot->s_node)) {
+		/* capture dir */
+		//struct vkvv_dir_rec *dir = vkvv_dir_get(&slot->s_node->n_addr);
+		// M0_BTREE_TX_CAPTURE(tx, seg, dir,
+		// 		    sizeof(*dir) * h->vkvv_dir_entries);
+		// if (cr == CR_ALL) {
+		// 	int krsize;
+		// 	int vrsize;
+		// 	M0_ASSERT(slot->s_idx == 0);
+
+		// 	krsize = h->fkvv_ksize * h->fkvv_used;
+		// 	vrsize = val_offset_get(slot->s_node, h->fkvv_used - 1);
+
+		// 	start_key = fkvv_key(slot->s_node, 0);
+		// 	last_val  = fkvv_val(slot->s_node, h->fkvv_used - 1);
+
+		// 	M0_BTREE_TX_CAPTURE(tx, seg, start_key, krsize);
+		// 	M0_BTREE_TX_CAPTURE(tx, seg, last_val, vrsize);
+		// } else if (cr == CR_NONE) {
+		// 	if (h->fkvv_opaque == NULL)
+		// 		hsize += sizeof(h->fkvv_opaque);
+		// } else {
+		// 	int  krsize;
+		// 	int  vrsize;
+
+		// 	start_key = fkvv_key(slot->s_node, slot->s_idx);
+		// 	last_val  = fkvv_val(slot->s_node, slot->s_idx);
+		// 	krsize = h->fkvv_ksize;
+		// 	vrsize = fkvv_rec_val_size(slot->s_node, slot->s_idx);
+		// 	if (fkvv_crctype_get(slot->s_node) ==
+		// 	    M0_BCT_BTREE_ENC_RAW_HASH)
+		// 		vrsize += CRC_VALUE_SIZE;
+		// 	M0_BTREE_TX_CAPTURE(tx, seg, start_key, krsize);
+		// 	M0_BTREE_TX_CAPTURE(tx, seg, last_val, vrsize);
+		// }
+		// M0_BTREE_TX_CAPTURE(tx, seg, h, hsize);
 		return;
 	}
 
@@ -8230,6 +8288,7 @@ static int64_t btree_put_kv_tick(struct m0_sm_op *smop)
 	}
 	case P_MAKESPACE: {
 		struct slot node_slot;
+		int bnc_count = 0;
 		lev = &oi->i_level[oi->i_used];
 		node_slot = (struct slot){
 			.s_node = lev->l_node,
@@ -8244,12 +8303,14 @@ static int64_t btree_put_kv_tick(struct m0_sm_op *smop)
 //			if (!bnode_isfit(&node_slot))
 //				return btree_put_makespace_phase(bop);
 			if (!bnode_isfit(&node_slot)) {
-				if(!bnode_compaction_check(&node_slot))
+				if(!bnode_compaction_check(&node_slot)) {
 					return btree_put_makespace_phase(bop);
-				else
+				} else {
 					bnode_compaction(&node_slot);
+					bnc_count++;
+					M0_ASSERT(bnode_isfit(&node_slot) == true);
+				}
 			}
-
 			bnode_lock(lev->l_node);
 			/**
 			 * Check if crc type of new record is same as crc type
