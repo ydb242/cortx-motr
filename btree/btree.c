@@ -11096,8 +11096,8 @@ static int ut_btree_kv_get_cb(struct m0_btree_cb *cb, struct m0_btree_rec *rec)
 
 			if (key != value)
 				check_failed = true;
-			if (value == key + 1)
-				check_failed = false;
+			// if (value == key + 1)
+			// 	check_failed = false;
 		}
 
 		/**
