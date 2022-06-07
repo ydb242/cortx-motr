@@ -8334,6 +8334,7 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 		if (!bnode_isfit(&tgt)) {
 			M0_ASSERT(bnode_compaction_check(&tgt) && tgt.s_node == lev->l_node);
 			bnode_compaction(&tgt);
+			btree_node_capture_enlist(oi, lev->l_node, 0, CR_ALL);
 		}
 		bnode_make (&tgt);
 		REC_INIT(&tgt.s_rec, &p_key, &ksize, &p_val, &vsize);
@@ -8435,6 +8436,7 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 			if (is_compaction)
 			{
 				bnode_compaction(&node_slot);
+				btree_node_capture_enlist(oi, lev->l_node, 0, CR_ALL);
 				M0_ASSERT(bnode_isfit(&node_slot) == true);
 			}
 
@@ -8474,6 +8476,7 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 		if (!bnode_isfit(&tgt)) {
 			M0_ASSERT(bnode_compaction_check(&tgt) && tgt.s_node == lev->l_node);
 			bnode_compaction(&tgt);
+			btree_node_capture_enlist(oi, lev->l_node, 0, CR_ALL);
 		}
 		tgt.s_rec = new_rec;
 		bnode_make(&tgt);
@@ -8835,6 +8838,7 @@ static int64_t btree_put_kv_tick(struct m0_sm_op *smop)
 				} else {
 					bnode_lock(lev->l_node);
 					bnode_compaction(&node_slot);
+					btree_node_capture_enlist(oi, lev->l_node, 0, CR_ALL);
 					bnc_count++;
 					M0_ASSERT(bnode_isfit(&node_slot) == true);
 					bnode_unlock(lev->l_node);
