@@ -7910,6 +7910,7 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 	int                    i;
 	int                    vsize_diff = 0;
 	int                    rc;
+	int after_count, before_count;
 
 	//M0_LOG(M0_ALWAYS, "*** SPLIT ***");
 	/**
@@ -7921,8 +7922,13 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 	bnode_lock(lev->l_node);
 
 	lev->i_alloc_in_use = true;
+	before_count = bnode_count_rec(lev->l_node);
+
 
 	btree_put_split_and_find(lev->l_alloc, lev->l_node, &bop->bo_rec, &tgt);
+
+	after_count= bnode_count_rec(lev->l_node) + bnode_count_rec(lev->l_alloc);
+	M0_ASSERT(after_count == before_count);
 
 	if (!oi->i_key_found) {
 		/* PUT operation */
@@ -7938,6 +7944,9 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 		bnode_make (&tgt);
 		REC_INIT(&tgt.s_rec, &p_key, &ksize, &p_val, &vsize);
 		bnode_rec(&tgt);
+		after_count= bnode_count_rec(lev->l_node) + bnode_count_rec(lev->l_alloc);
+		M0_ASSERT(after_count - 1 == before_count);
+		tgt.s_rec.r_flags = M0_BSC_SUCCESS;
 	} else {
 		/* UPDATE operation */
 		REC_INIT(&tgt.s_rec, &p_key, &ksize, &p_val, &vsize);
@@ -7951,9 +7960,12 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 		*/
 		bnode_val_resize(&tgt, vsize_diff, &bop->bo_rec);
 		bnode_rec(&tgt);
+		after_count= bnode_count_rec(lev->l_node) + bnode_count_rec(lev->l_alloc);
+		M0_ASSERT(after_count == before_count);
+		tgt.s_rec.r_flags = M0_BSC_SUCCESS;
 	}
 
-	tgt.s_rec.r_flags = M0_BSC_SUCCESS;
+
 	rc = bop->bo_cb.c_act(&bop->bo_cb, &tgt.s_rec);
 	if (rc) {
 		/**
@@ -8047,9 +8059,11 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 		bnode_lock(lev->l_node);
 
 		lev->i_alloc_in_use = true;
-
+		before_count = bnode_count_rec(lev->l_node);
 		btree_put_split_and_find(lev->l_alloc, lev->l_node, &new_rec,
 					 &tgt);
+		after_count= bnode_count_rec(lev->l_node) + bnode_count_rec(lev->l_alloc);
+		M0_ASSERT(after_count == before_count);
 		if (!bnode_isfit(&tgt)) {
 			M0_ASSERT(bnode_compaction_check(&tgt) && tgt.s_node == lev->l_node);
 			bnode_compaction(&tgt);
@@ -11096,8 +11110,10 @@ static int ut_btree_kv_get_cb(struct m0_btree_cb *cb, struct m0_btree_rec *rec)
 
 			if (key != value)
 				check_failed = true;
-			// if (value == key + 1)
-			// 	check_failed = false;
+			if (value == key + 1)
+				check_failed = false;
+			if (value == key + 2)
+				check_failed = false;
 		}
 
 		/**
@@ -14893,7 +14909,7 @@ static void get_rec_at_index(struct nd *node, int idx, uint64_t *key,  uint64_t 
 		*val = *(uint64_t *)p_val;
 }
 
-static void m0_btree_ut_traversal(struct td *tree)
+M0_UNUSED static void m0_btree_ut_traversal(struct td *tree)
 {
 	struct nd *root = tree->t_root;
 	struct nd *queue[10000];
@@ -15088,7 +15104,7 @@ static void ut_multi_stream_traversal(void)
 			minkey = key;
 		if (key > maxkey)
 			maxkey = key;
-		printf("%" PRId64 "\t", key);
+		//printf("%" PRId64 "\t", key);
 		value = key+1;
 
 		put_data.key       = &rec.r_key;
@@ -15110,7 +15126,85 @@ static void ut_multi_stream_traversal(void)
 		m0_be_tx_close_sync(tx);
 		m0_be_tx_fini(tx);
 
-		m0_btree_ut_traversal(tree->t_desc);
+		//m0_btree_ut_traversal(tree->t_desc);
+
+		int j;
+		for(j = 1; j <= i ; j++)
+		{
+			struct ut_cb_data    get_data;
+			struct m0_btree_key  get_key;
+			struct m0_bufvec     get_value;
+			uint64_t             find_key;
+			void                *find_key_ptr      = &find_key;
+			m0_bcount_t          find_key_size     = sizeof find_key;
+			struct m0_btree_key  find_key_in_tree;
+
+			find_key = j;
+			find_key_in_tree.k_data =
+				M0_BUFVEC_INIT_BUF(&find_key_ptr, &find_key_size);
+
+			get_key.k_data = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
+			get_value      = M0_BUFVEC_INIT_BUF(&v_ptr, &vsize);
+
+			get_data.key            = &get_key;
+			get_data.value          = &get_value;
+			get_data.check_value    = true;
+			get_data.crc            = M0_BCT_NO_CRC;
+			get_data.embedded_ksize = false;
+			get_data.embedded_vsize = false;
+
+			ut_cb.c_act    = ut_btree_kv_get_cb;
+			ut_cb.c_datum  = &get_data;
+
+			rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
+						m0_btree_get(tree,
+								&find_key_in_tree,
+								&ut_cb, BOF_EQUAL,
+								&kv_op));
+				M0_ASSERT(rc == M0_BSC_SUCCESS &&
+				j == key);
+		}
+
+
+
+	}
+
+	for (i = 1; i <= (recs_per_stream*stream_count); i++) {
+		struct ut_cb_data    put_data;
+		struct m0_btree_rec  rec;
+
+		rec.r_key.k_data   = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
+		rec.r_val          = M0_BUFVEC_INIT_BUF(&v_ptr, &vsize);
+		rec.r_crc_type     = M0_BCT_NO_CRC;
+
+		key = i;
+		if (key < minkey)
+			minkey = key;
+		if (key > maxkey)
+			maxkey = key;
+		//printf("%" PRId64 "\t", key);
+		value = key+2;
+
+		put_data.key       = &rec.r_key;
+		put_data.value     = &rec.r_val;
+
+		ut_cb.c_act        = ut_btree_kv_update_cb;
+		ut_cb.c_datum      = &put_data;
+
+		m0_be_ut_tx_init(tx, ut_be);
+		m0_be_tx_prep(tx, &cred);
+		rc = m0_be_tx_open_sync(tx);
+		M0_ASSERT(rc == 0);
+
+		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
+						m0_btree_update(tree, &rec,
+								&ut_cb, 0,
+								&kv_op, tx));
+		M0_ASSERT(rc == 0 && put_data.flags == M0_BSC_SUCCESS);
+		m0_be_tx_close_sync(tx);
+		m0_be_tx_fini(tx);
+
+		//m0_btree_ut_traversal(tree->t_desc);
 
 		int j;
 		for(j = 1; j <= i ; j++)
@@ -15187,7 +15281,7 @@ static void ut_multi_stream_traversal(void)
 		M0_ASSERT(rc == M0_BSC_SUCCESS &&
 			  i == key);
 	}
-
+	//m0_btree_ut_traversal(tree->t_desc);
 	cred = M0_BE_TX_CREDIT(0, 0);
 	m0_btree_del_credit(tree, 1, ksize, -1, &cred);
 	{
@@ -15220,6 +15314,334 @@ static void ut_multi_stream_traversal(void)
 
 		struct m0_btree_cb *del_cb;
 		del_key = i ;
+
+		del_cb = (del_key % 5 == 0) ? NULL : &ut_cb;
+		m0_be_ut_tx_init(tx, ut_be);
+		m0_be_tx_prep(tx, &cred);
+		rc = m0_be_tx_open_sync(tx);
+		M0_ASSERT(rc == 0);
+
+		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
+						m0_btree_del(tree,
+							&del_key_in_tree,
+							del_cb,
+							&kv_op, tx));
+		M0_ASSERT(rc == 0 && del_data.flags == M0_BSC_SUCCESS);
+		m0_be_tx_close_sync(tx);
+		m0_be_tx_fini(tx);
+
+	}
+
+	cred = M0_BE_TX_CREDIT(0, 0);
+	m0_be_allocator_credit(NULL, M0_BAO_FREE_ALIGNED, rnode_sz,
+			       rnode_sz_shift, &cred);
+	m0_btree_destroy_credit(tree, NULL, &cred, 1);
+
+	m0_be_ut_tx_init(tx, ut_be);
+	m0_be_tx_prep(tx, &cred);
+	rc = m0_be_tx_open_sync(tx);
+	M0_ASSERT(rc == 0);
+
+	rc = M0_BTREE_OP_SYNC_WITH_RC(&b_op, m0_btree_destroy(tree, &b_op, tx));
+	M0_ASSERT(rc == 0);
+	M0_SET0(&btree);
+
+	/** Delete temp node space which was used as root node for the tree. */
+	buf = M0_BUF_INIT(rnode_sz, rnode);
+	M0_BE_FREE_ALIGN_BUF_SYNC(&buf, rnode_sz_shift, seg, tx);
+
+	m0_be_tx_close_sync(tx);
+	m0_be_tx_fini(tx);
+
+	btree_ut_fini();
+}
+
+static void ut_rand_multi_stream_traversal(void)
+{
+	void                   *rnode;
+	int                     i;
+	time_t                  curr_time;
+	struct m0_btree_cb      ut_cb;
+	struct m0_be_tx         tx_data         = {};
+	struct m0_be_tx        *tx              = &tx_data;
+	struct m0_be_tx_credit  cred            = {};
+	struct m0_btree_op      b_op            = {};
+	uint32_t                stream_count    = 0;
+	uint64_t                recs_per_stream = 0;
+	struct m0_btree_op      kv_op           = {};
+	struct m0_btree        *tree;
+	struct m0_btree         btree = {};
+	struct m0_btree_type    btree_type      = {.tt_id = M0_BT_UT_KV_OPS,
+						  .ksize = -1,
+						  .vsize = -1,
+						  };
+	uint64_t                key;
+	uint64_t                value;
+	m0_bcount_t             ksize           = sizeof key;
+	m0_bcount_t             vsize           = sizeof value;
+	void                   *k_ptr           = &key;
+	void                   *v_ptr           = &value;
+	int                     rc;
+	struct m0_buf           buf;
+	uint64_t                maxkey          = 0;
+	uint64_t                minkey          = UINT64_MAX;
+	uint32_t                rnode_sz        = m0_pagesize_get();
+	uint32_t                rnode_sz_shift;
+	struct m0_fid           fid             = M0_FID_TINIT('b', 0, 1);
+	M0_ENTRY();
+
+	time(&curr_time);
+	M0_LOG(M0_INFO, "Using seed %lu", curr_time);
+	srandom(curr_time);
+
+	stream_count = 1;
+
+	recs_per_stream = 10000;
+
+	btree_ut_init();
+	/**
+	 *  Run valid scenario:
+	 *  1) Create a btree
+	 *  2) Adds records in multiple streams to the created tree.
+	 *  3) Confirms the records are present in the tree.
+	 *  4) Deletes all the records from the tree using multiple streams.
+	 *  5) Close the btree
+	 *  6) Destroy the btree
+	 *
+	 *  Capture each operation in a separate transaction.
+	 */
+
+	M0_ASSERT(rnode_sz != 0 && m0_is_po2(rnode_sz));
+	rnode_sz_shift = __builtin_ffsl(rnode_sz) - 1;
+	cred = M0_BE_TX_CB_CREDIT(0, 0, 0);
+	m0_be_allocator_credit(NULL, M0_BAO_ALLOC_ALIGNED, rnode_sz,
+			       rnode_sz_shift, &cred);
+	m0_btree_create_credit(&btree_type, &cred, 1);
+
+	/** Prepare transaction to capture tree operations. */
+	m0_be_ut_tx_init(tx, ut_be);
+	m0_be_tx_prep(tx, &cred);
+	rc = m0_be_tx_open_sync(tx);
+	M0_ASSERT(rc == 0);
+
+	/** Create temp node space and use it as root node for btree */
+	buf = M0_BUF_INIT(rnode_sz, NULL);
+	M0_BE_ALLOC_ALIGN_BUF_SYNC(&buf, rnode_sz_shift, seg, tx);
+	rnode = buf.b_addr;
+
+	rc = M0_BTREE_OP_SYNC_WITH_RC(&b_op, m0_btree_create(rnode, rnode_sz,
+							     &btree_type,
+							     M0_BCT_NO_CRC,
+							     EMBEDDED_INDIRECT,
+							     &b_op, &btree, seg,
+							     &fid, tx, NULL));
+	M0_ASSERT(rc == M0_BSC_SUCCESS);
+	m0_be_tx_close_sync(tx);
+	m0_be_tx_fini(tx);
+
+	tree = b_op.bo_arbor;
+
+	cred = M0_BE_TX_CB_CREDIT(0, 0, 0);
+	m0_btree_put_credit(tree, 1, ksize, vsize, &cred);
+	{
+		struct m0_be_tx_credit  cred2 = {};
+
+		m0_btree_put_credit2(&btree_type, rnode_sz, 1, ksize, vsize,
+				     &cred2);
+		M0_ASSERT(m0_be_tx_credit_eq(&cred,  &cred2));
+	}
+
+	time(&curr_time);
+	printf("\nUsing seed %lu", curr_time);
+
+	srandom(curr_time);
+
+	for (i = 1; i <= (recs_per_stream*stream_count); i++) {
+		struct ut_cb_data    put_data;
+		struct m0_btree_rec  rec;
+
+		rec.r_key.k_data   = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
+		rec.r_val          = M0_BUFVEC_INIT_BUF(&v_ptr, &vsize);
+		rec.r_crc_type     = M0_BCT_NO_CRC;
+
+		key = value = m0_byteorder_cpu_to_be64(random());
+		if (key < minkey)
+			minkey = key;
+		if (key > maxkey)
+			maxkey = key;
+		//printf("%" PRId64 "\t", key);
+		// value = key+1;
+
+
+		put_data.key       = &rec.r_key;
+		put_data.value     = &rec.r_val;
+
+		ut_cb.c_act        = ut_btree_kv_put_cb;
+		ut_cb.c_datum      = &put_data;
+
+		m0_be_ut_tx_init(tx, ut_be);
+		m0_be_tx_prep(tx, &cred);
+		rc = m0_be_tx_open_sync(tx);
+		M0_ASSERT(rc == 0);
+
+		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
+						m0_btree_put(tree, &rec,
+								&ut_cb,
+								&kv_op, tx));
+		M0_ASSERT(rc == 0 && put_data.flags == M0_BSC_SUCCESS);
+		m0_be_tx_close_sync(tx);
+		m0_be_tx_fini(tx);
+
+		//m0_btree_ut_traversal(tree->t_desc);
+	}
+#if 0
+	for (i = 1; i <= (recs_per_stream*stream_count); i++) {
+		struct ut_cb_data    put_data;
+		struct m0_btree_rec  rec;
+
+		rec.r_key.k_data   = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
+		rec.r_val          = M0_BUFVEC_INIT_BUF(&v_ptr, &vsize);
+		rec.r_crc_type     = M0_BCT_NO_CRC;
+
+		key = i;
+		if (key < minkey)
+			minkey = key;
+		if (key > maxkey)
+			maxkey = key;
+		//printf("%" PRId64 "\t", key);
+		value = key+2;
+
+		put_data.key       = &rec.r_key;
+		put_data.value     = &rec.r_val;
+
+		ut_cb.c_act        = ut_btree_kv_update_cb;
+		ut_cb.c_datum      = &put_data;
+
+		m0_be_ut_tx_init(tx, ut_be);
+		m0_be_tx_prep(tx, &cred);
+		rc = m0_be_tx_open_sync(tx);
+		M0_ASSERT(rc == 0);
+
+		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
+						m0_btree_update(tree, &rec,
+								&ut_cb, 0,
+								&kv_op, tx));
+		M0_ASSERT(rc == 0 && put_data.flags == M0_BSC_SUCCESS);
+		m0_be_tx_close_sync(tx);
+		m0_be_tx_fini(tx);
+
+		//m0_btree_ut_traversal(tree->t_desc);
+
+		int j;
+		for(j = 1; j <= i ; j++)
+		{
+			struct ut_cb_data    get_data;
+			struct m0_btree_key  get_key;
+			struct m0_bufvec     get_value;
+			uint64_t             find_key;
+			void                *find_key_ptr      = &find_key;
+			m0_bcount_t          find_key_size     = sizeof find_key;
+			struct m0_btree_key  find_key_in_tree;
+
+			find_key = j;
+			find_key_in_tree.k_data =
+				M0_BUFVEC_INIT_BUF(&find_key_ptr, &find_key_size);
+
+			get_key.k_data = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
+			get_value      = M0_BUFVEC_INIT_BUF(&v_ptr, &vsize);
+
+			get_data.key            = &get_key;
+			get_data.value          = &get_value;
+			get_data.check_value    = true;
+			get_data.crc            = M0_BCT_NO_CRC;
+			get_data.embedded_ksize = false;
+			get_data.embedded_vsize = false;
+
+			ut_cb.c_act    = ut_btree_kv_get_cb;
+			ut_cb.c_datum  = &get_data;
+
+			rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
+						m0_btree_get(tree,
+								&find_key_in_tree,
+								&ut_cb, BOF_EQUAL,
+								&kv_op));
+				M0_ASSERT(rc == M0_BSC_SUCCESS &&
+				j == key);
+		}
+
+
+
+	}
+#endif
+	srandom(curr_time);
+	for (i = 1; i <= (recs_per_stream*stream_count); i++) {
+		struct ut_cb_data    get_data;
+		struct m0_btree_key  get_key;
+		struct m0_bufvec     get_value;
+		uint64_t             find_key;
+		void                *find_key_ptr      = &find_key;
+		m0_bcount_t          find_key_size     = sizeof find_key;
+		struct m0_btree_key  find_key_in_tree;
+
+		find_key = i;
+		find_key = m0_byteorder_cpu_to_be64(random());
+		find_key_in_tree.k_data =
+			M0_BUFVEC_INIT_BUF(&find_key_ptr, &find_key_size);
+
+		get_key.k_data = M0_BUFVEC_INIT_BUF(&k_ptr, &ksize);
+		get_value      = M0_BUFVEC_INIT_BUF(&v_ptr, &vsize);
+
+		get_data.key            = &get_key;
+		get_data.value          = &get_value;
+		get_data.check_value    = true;
+		get_data.crc            = M0_BCT_NO_CRC;
+		get_data.embedded_ksize = false;
+		get_data.embedded_vsize = false;
+
+		ut_cb.c_act    = ut_btree_kv_get_cb;
+		ut_cb.c_datum  = &get_data;
+
+		rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
+					      m0_btree_get(tree,
+							   &find_key_in_tree,
+							   &ut_cb, BOF_EQUAL,
+							   &kv_op));
+		M0_ASSERT(rc == M0_BSC_SUCCESS &&
+			  find_key == key);
+	}
+	//m0_btree_ut_traversal(tree->t_desc);
+	cred = M0_BE_TX_CREDIT(0, 0);
+	m0_btree_del_credit(tree, 1, ksize, -1, &cred);
+	{
+		struct m0_be_tx_credit  cred2 = {};
+
+		m0_btree_del_credit2(&btree_type, rnode_sz, 1, ksize, vsize,
+				     &cred2);
+		M0_ASSERT(m0_be_tx_credit_eq(&cred,  &cred2));
+	}
+	srandom(curr_time);
+	for (i = 1; i <= (recs_per_stream*stream_count); i++) {
+		uint64_t            del_key;
+		struct m0_btree_key del_key_in_tree;
+		void                *p_del_key      = &del_key;
+		m0_bcount_t         del_key_size    = sizeof del_key;
+		struct ut_cb_data   del_data;
+
+		del_data = (struct ut_cb_data){.key = &del_key_in_tree,
+			.value       = NULL,
+			.check_value = false,
+			.crc         = M0_BCT_NO_CRC,
+		};
+
+		del_key_in_tree.k_data = M0_BUFVEC_INIT_BUF(&p_del_key,
+							    &del_key_size);
+
+		ut_cb.c_act   = ut_btree_kv_del_cb;
+		ut_cb.c_datum = &del_data;
+
+
+		struct m0_btree_cb *del_cb;
+		del_key = m0_byteorder_cpu_to_be64(random());
 
 		del_cb = (del_key % 5 == 0) ? NULL : &ut_cb;
 		m0_be_ut_tx_init(tx, ut_be);
@@ -15333,6 +15755,7 @@ struct m0_ut_suite btree_ut = {
 		{"btree_crc_persist_indir_test",
 					ut_btree_crc_persist_indir_test},
 		{"btree_multi_stream_traversal",    ut_multi_stream_traversal},
+		{"ut_rand_multi_stream_traversal",ut_rand_multi_stream_traversal},
 		{NULL, NULL}
 	}
 };
