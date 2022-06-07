@@ -13510,23 +13510,44 @@ static void ut_rt_rt_kv_oper(void)
 
 static void ut_st_st_indir_kv_oper(void)
 {
-	btree_ut_kv_oper(1, 1, 4, EMBEDDED_INDIRECT);
+	int i;
+	for (i = 1; i <= BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE; i++)
+	{
+		if (btree_node_format[i] != NULL)
+			btree_ut_kv_oper(1, 1, i, EMBEDDED_INDIRECT);
+	}
 }
 
 static void ut_mt_st_indir_kv_oper(void)
 {
-	btree_ut_kv_oper(0, 1, 4, EMBEDDED_INDIRECT);
+	int i;
+	for (i = 1; i <= BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE; i++)
+	{
+		if (btree_node_format[i] != NULL)
+			btree_ut_kv_oper(0, 1, i, EMBEDDED_INDIRECT);
+	}
 }
 
 static void ut_mt_mt_indir_kv_oper(void)
 {
-	btree_ut_kv_oper(0, 0, 4, EMBEDDED_INDIRECT);
+	int i;
+	for (i = 1; i <= BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE; i++)
+	{
+		if (btree_node_format[i] != NULL)
+			btree_ut_kv_oper(0, 0, i, EMBEDDED_INDIRECT);
+	}
+	
 }
 
 static void ut_rt_rt_indir_kv_oper(void)
 {
-	btree_ut_kv_oper(RANDOM_THREAD_COUNT, RANDOM_TREE_COUNT, 4,
+	int i;
+	for (i = 1; i <= BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE; i++)
+	{
+		if (btree_node_format[i] != NULL)
+			btree_ut_kv_oper(RANDOM_THREAD_COUNT, RANDOM_TREE_COUNT, i,
 			 EMBEDDED_INDIRECT);
+	}
 }
 
 /**
