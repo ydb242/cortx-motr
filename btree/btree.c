@@ -7976,10 +7976,11 @@ static void btree_node_capture_enlist(struct m0_btree_oimpl *oi,
 			arr[i].nc_cr   = cr;
 			break;
 		} else if (arr[i].nc_node == addr) {
-			M0_ASSERT(cr == CR_ALL);
-			arr[i].nc_cr  = cr;
-			arr[i].nc_idx = arr[i].nc_idx < start_idx ?
+			if (!(arr[i].nc_cr == CR_ALL)) {
+				arr[i].nc_cr  = cr;
+				arr[i].nc_idx = arr[i].nc_idx < start_idx ?
 				        arr[i].nc_idx : start_idx;
+			}
 			break;
 		}
 	}
