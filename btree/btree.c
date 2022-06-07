@@ -574,7 +574,7 @@
 #include "ut/ut.h"          /** struct m0_ut_suite */
 #endif
 
-#define AVOID_BE_SEGMENT                  1
+#define AVOID_BE_SEGMENT                  0
 #define M0_BTREE_TRICKLE_NUM_NODES        5
 /**
  *  --------------------------------------------
