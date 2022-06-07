@@ -2199,6 +2199,13 @@ static int64_t bnode_get(struct node_op *op, struct td *tree,
 			m0_rwlock_write_unlock(&list_lock);
 			return nxt;
 		}
+
+		if (!segaddr_header_isvalid(addr)) {
+			op->no_op.o_sm.sm_rc = M0_ERR(-EINVAL);
+			m0_rwlock_write_unlock(&list_lock);
+			return nxt;
+		}
+
 		/**
 		 * If node descriptor is not present allocate a new one
 		 * and assign to node.
@@ -8450,7 +8457,7 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 			 */
 			M0_ASSERT(bnode_expensive_invariant(lev->l_node));
 			bnode_unlock(lev->l_node);
-			check_dbg_tree(bop->bo_arbor->t_desc);
+			//check_dbg_tree(bop->bo_arbor->t_desc);
 			return P_CAPTURE;
 		}
 
@@ -8497,7 +8504,7 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 		M0_ASSERT(bnode_expensive_invariant(lev->l_node));
 		bnode_unlock(lev->l_alloc);
 		bnode_unlock(lev->l_node);
-		check_dbg_tree(bop->bo_arbor->t_desc);
+		//check_dbg_tree(bop->bo_arbor->t_desc);
 
 		node_slot.s_node = lev->l_alloc;
 		node_slot.s_idx = bnode_count(node_slot.s_node);
@@ -8781,28 +8788,28 @@ static int64_t btree_put_kv_tick(struct m0_sm_op *smop)
 		/** Fall through if path_check is successful. */
 	case P_SANITY_CHECK: {
 		int rc = 0;
-		char *ln = NULL;
-		#ifndef __KERNEL__
-		ln = malloc(1048576);
-		#endif
-		if (ln != NULL)
-			memset(ln, 0, 1048576);
+		// char *ln = NULL;
+		// #ifndef __KERNEL__
+		// ln = malloc(1048576);
+		// #endif
+		// if (ln != NULL)
+		// 	memset(ln, 0, 1048576);
 
 		if (oi->i_key_found && bop->bo_opc == M0_BO_PUT)
 			rc = -EEXIST;
 		else if (!oi->i_key_found && bop->bo_opc == M0_BO_UPDATE &&
 			 !(bop->bo_flags & BOF_INSERT_IF_NOT_FOUND)) {
 			rc = -ENOENT;
-			M0_LOG(M0_ALWAYS,"PUT T(t=%p) >%s", bop->bo_arbor,
-			vkvv_dbg_tree(tree, ln, 1048576));
-			M0_ASSERT(0);
+			// M0_LOG(M0_ALWAYS,"PUT T(t=%p) >%s", bop->bo_arbor,
+			// vkvv_dbg_tree(tree, ln, 1048576));
+			// M0_ASSERT(0);
 			}
 		if (rc) {
 			lock_op_unlock(tree);
 			return fail(bop, rc);
 		}
-		if (ln != NULL)
-			m0_free(ln);
+		// if (ln != NULL)
+		// 	m0_free(ln);
 		return P_MAKESPACE;
 	}
 	case P_MAKESPACE: {
@@ -8934,7 +8941,7 @@ static int64_t btree_put_kv_tick(struct m0_sm_op *smop)
 	}
 	case P_CAPTURE:
 		btree_tx_nodes_capture(oi, bop->bo_tx);
-		check_dbg_tree(bop->bo_arbor->t_desc);
+		//check_dbg_tree(bop->bo_arbor->t_desc);
 		lock_op_unlock(tree);
 		return m0_sm_op_sub(&bop->bo_op, P_CLEANUP, P_FINI);
 	case P_CLEANUP:
@@ -10483,7 +10490,7 @@ static int64_t btree_del_kv_tick(struct m0_sm_op *smop)
 	}
 	case P_CAPTURE:
 		btree_tx_nodes_capture(oi, bop->bo_tx);
-		check_dbg_tree(bop->bo_arbor->t_desc);
+		//check_dbg_tree(bop->bo_arbor->t_desc);
 		return P_FREENODE;
 	case P_FREENODE : {
 		int i;
@@ -11641,7 +11648,7 @@ enum {
 	MIN_RECS_PER_STREAM    = 5,
 	MAX_RECS_PER_STREAM    = 2048,
 
-	MAX_RECS_PER_THREAD    = 500, /** Records count for each thread */
+	MAX_RECS_PER_THREAD    = 10000, /** Records count for each thread */
 
 	MIN_TREE_LOOPS         = 1000,
 	MAX_TREE_LOOPS         = 2000,
@@ -13307,7 +13314,7 @@ static void btree_ut_kv_oper(int32_t thread_count, int32_t tree_count,
 	online_cpu_id_get(&cpuid_ptr, &cpu_count);
 
 	if (thread_count == 0)
-		thread_count = 5; /** Skip Core-0 */
+		thread_count = cpu_count - 1; /** Skip Core-0 */
 	else if (thread_count == RANDOM_THREAD_COUNT) {
 		thread_count = 1;
 		if (cpu_count > 2) {
