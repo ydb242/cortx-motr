@@ -2490,6 +2490,7 @@ static void ff_node_key(struct slot *slot);
 static void ff_child(struct slot *slot, struct segaddr *addr);
 static bool ff_isfit(struct slot *slot);
 static bool ff_compaction_check(struct slot *slot);
+static void ff_compaction(struct slot *slot);
 static void ff_done(struct slot *slot, bool modified);
 static void ff_make(struct slot *slot);
 static bool ff_newval_isfit(struct slot *slot, struct m0_btree_rec *old_rec,
@@ -2552,7 +2553,7 @@ static const struct node_type fixed_format = {
 	.nt_child                     = ff_child,
 	.nt_isfit                     = ff_isfit,
 	.nt_compaction_check          = ff_compaction_check,
-	.nt_compaction                = NULL,
+	.nt_compaction                = ff_compaction,
 	.nt_done                      = ff_done,
 	.nt_make                      = ff_make,
 	.nt_newval_isfit              = ff_newval_isfit,
@@ -2906,7 +2907,10 @@ static bool ff_compaction_check(struct slot *slot)
 {
 	return false;
 }
-
+static void ff_compaction(struct slot *slot)
+{
+	return;
+}
 static void ff_done(struct slot *slot, bool modified)
 {
 	/**
@@ -3643,6 +3647,7 @@ static void fkvv_node_key(struct slot *slot);
 static void fkvv_child(struct slot *slot, struct segaddr *addr);
 static bool fkvv_isfit(struct slot *slot);
 static bool fkvv_compaction_check(struct slot *slot);
+static void fkvv_compaction(struct slot *slot);
 static void fkvv_done(struct slot *slot, bool modified);
 static void fkvv_make(struct slot *slot);
 static bool fkvv_newval_isfit(struct slot *slot, struct m0_btree_rec *old_rec,
@@ -3698,7 +3703,7 @@ static const struct node_type fixed_ksize_variable_vsize_format = {
 	.nt_child                     = fkvv_child,
 	.nt_isfit                     = fkvv_isfit,
 	.nt_compaction_check          = fkvv_compaction_check,
-	.nt_compaction                = NULL,
+	.nt_compaction                = fkvv_compaction,
 	.nt_done                      = fkvv_done,
 	.nt_make                      = fkvv_make,
 	.nt_newval_isfit              = fkvv_newval_isfit,
@@ -4188,6 +4193,11 @@ static bool fkvv_isfit(struct slot *slot)
 static bool fkvv_compaction_check(struct slot *slot)
 {
 	return false;
+}
+
+static void fkvv_compaction(struct slot *slot)
+{
+	return;
 }
 
 static void fkvv_done(struct slot *slot, bool modified)
@@ -8428,7 +8438,7 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 		node_slot.s_rec  = new_rec;
 
 		is_fit        = bnode_isfit(&node_slot);
-		is_compaction = is_fit ? : bnode_compaction_check(&node_slot);
+		is_compaction = is_fit ? false : bnode_compaction_check(&node_slot);
 
 		if (is_fit || is_compaction) {
 
@@ -8474,12 +8484,12 @@ static int64_t btree_put_makespace_phase(struct m0_btree_op *bop)
 					 &tgt);
 		after_count =  bnode_count_rec(lev->l_node) + bnode_count_rec(lev->l_alloc);
 		M0_ASSERT(before_count == after_count);
+		tgt.s_rec = new_rec;
 		if (!bnode_isfit(&tgt)) {
 			M0_ASSERT(bnode_compaction_check(&tgt) && tgt.s_node == lev->l_node);
 			bnode_compaction(&tgt);
 			btree_node_capture_enlist(oi, lev->l_node, 0, CR_ALL);
 		}
-		tgt.s_rec = new_rec;
 		bnode_make(&tgt);
 		REC_INIT(&tgt.s_rec, &p_key_1, &ksize_1, &p_val_1, &vsize_1);
 		bnode_rec(&tgt);
