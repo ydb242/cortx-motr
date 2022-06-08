@@ -5932,8 +5932,11 @@ static uint32_t vkvv_lnode_rec_val_size(const struct nd *node, int idx)
 static uint32_t vkvv_rec_val_size(const struct nd *node, int idx)
 {
 	struct vkvv_head *h = vkvv_data(node);
-	int vsize;
-	if (IS_EMBEDDED_INDIRECT(node)) {
+	int               vsize;
+
+	if (IS_INTERNAL_NODE(node))
+		vsize = INTERNAL_NODE_VALUE_SIZE;
+	else if (IS_EMBEDDED_INDIRECT(node)) {
 		struct vkvv_dir_rec *dir   = vkvv_dir_get(node);
 		vsize = dir[idx].val_size;
 		if (vkvv_crctype_get(node) == M0_BCT_BTREE_ENC_RAW_HASH)
@@ -6261,6 +6264,9 @@ static bool vkvv_compaction_check(struct slot *slot)
 
 	if (!IS_EMBEDDED_INDIRECT(slot->s_node))
 		return false;
+
+	if (vkvv_level(slot->s_node) == 0 && vkvv_crctype_get(slot->s_node) == M0_BCT_BTREE_ENC_RAW_HASH)
+		incoming_vsize += CRC_VALUE_SIZE;
 
 	for (i = 0; i < h->vkvv_dir_entries; i++) {
 		total_avail_ksize += (dir[i].alloc_key_size - dir[i].key_size);
@@ -6954,12 +6960,14 @@ static bool vkvv_newval_isfit(struct slot *slot, struct m0_btree_rec *old_rec,
 	int old_vsize  = m0_vec_count(&old_rec->r_val.ov_vec);
 	int vsize_diff = new_vsize - old_vsize;
 	//if (vsize_diff <= 0)
-	if (vsize_diff <= 0 ||
-	    dir_entry[slot->s_idx].alloc_val_size >= new_vsize)
+	if (vsize_diff <= 0)
 		return true;
 
-	if (IS_EMBEDDED_INDIRECT(slot->s_node))
+	if (IS_EMBEDDED_INDIRECT(slot->s_node)) {
+		if (dir_entry[slot->s_idx].alloc_val_size >= new_vsize)
+			return true;
 		return vkvv_indir_isfit(slot->s_node, new_rec, 0);
+	}
 	else
 		return vkvv_space(slot->s_node) >= vsize_diff;
 }
@@ -11909,6 +11917,7 @@ enum {
 	RANDOM_VALUE_SIZE      = -1,
 
 	BE_UT_SEG_SIZE         = 10ULL * 1024ULL * 1024ULL * 1024ULL,
+	MAX_TEST_RETRIES       = 20,
 };
 #endif
 
@@ -14861,19 +14870,25 @@ static void ut_lru_test(void)
 			    .r_val        = M0_BUFVEC_INIT_BUF(&v_ptr, &vsize),
 			};
 	struct ut_cb_data           put_data;
+	bool                        restart_test    = false;
+	int                         retry_cnt       = 0;
+	m0_bcount_t                 limit;
 	/**
 	 * In this UT, we are testing the functionality of LRU list purge and
 	 * be-allocator with chunk align parameter.
 	 *
 	 * 1. Allocate and fill up the btree with multiple records.
-	 * 2. Verify the size increase in memory.
+	 * 2. Verify the size increase in memory. If size increase in memory is
+	 *    negative then go to step 5 and restart the test (step 1).
 	 * 3. Use the m0_btree_lrulist_purge() to reduce the size by freeing up
 	 *    the unused nodes present in LRU list.
 	 * 4. Verify the reduction in size.
+	 * 5. Cleanup btree and allocated resources.
 	 */
 	M0_ENTRY();
 
 	btree_ut_init();
+start_lru_test:
 	mem_init = sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGESIZE);
 	M0_LOG(M0_INFO,"Mem Init (%"PRId64").\n",mem_init);
 
@@ -14884,13 +14899,13 @@ static void ut_lru_test(void)
 			       rnode_sz_shift, &cred);
 	m0_btree_create_credit(&bt, &cred, 1);
 
-	/** Prepare transaction to capture tree operations. */
+	/* Prepare transaction to capture tree operations. */
 	m0_be_ut_tx_init(tx, ut_be);
 	m0_be_tx_prep(tx, &cred);
 	rc = m0_be_tx_open_sync(tx);
 	M0_ASSERT(rc == 0);
 
-	/** Create temp node space and use it as root node for btree */
+	/* Create temp node space and use it as root node for btree */
 	buf = M0_BUF_INIT(rnode_sz, NULL);
 	M0_BE_ALLOC_ALIGN_BUF_SYNC(&buf, rnode_sz_shift, seg, tx);
 	rnode = buf.b_addr;
@@ -14939,6 +14954,25 @@ static void ut_lru_test(void)
 
 	mem_after_alloc = sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGESIZE);
 	mem_increased   = mem_init - mem_after_alloc;
+	if (mem_increased < 0) {
+		restart_test = true;
+		retry_cnt++;
+		M0_LOG(M0_INFO, "Memory increased is negative because "
+				"Mem After Alloc (%"PRId64") is greater than "
+				"Mem Init (%"PRId64"), This can "
+				"happen due to other processes in system "
+				"might have released memory, hence cleaning up "
+				"the records and restarting the test.",
+				mem_after_alloc, mem_init);
+
+		/* Cleanup records and tree then restart the test. */
+		if (retry_cnt < MAX_TEST_RETRIES)
+			goto cleanup;
+		else
+			M0_ASSERT_INFO(mem_increased > 0,
+				       "Memory is still getting freed, hence "
+				       "exiting test with failure.");
+	}
 	M0_LOG(M0_INFO, "Mem After Alloc (%"PRId64") || Mem Increase (%"PRId64").\n",
 	       mem_after_alloc, mem_increased);
 
@@ -14948,6 +14982,60 @@ static void ut_lru_test(void)
 	mem_after_free = sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGESIZE);
 	M0_LOG(M0_INFO, "Mem After Free (%"PRId64") || Mem freed (%"PRId64").\n",
 	       mem_after_free, mem_freed);
+
+cleanup:
+	/**
+	 * The test assumes that "limit" will be more than the total number of
+	 * nodes present in the record. Hence only one function call to
+	 * m0_btree_truncate is sufficient.
+	 */
+	cred = M0_BE_TX_CREDIT(0, 0);
+	m0_btree_truncate_credit(tx, tree, &cred, &limit);
+	m0_be_ut_tx_init(tx, ut_be);
+	m0_be_tx_prep(tx, &cred);
+	rc = m0_be_tx_open_sync(tx);
+	M0_ASSERT(rc == 0);
+
+	rc = M0_BTREE_OP_SYNC_WITH_RC(&kv_op,
+				      m0_btree_truncate(tree, limit, tx,
+							&kv_op));
+	m0_be_tx_close_sync(tx);
+	m0_be_tx_fini(tx);
+
+	/* Verify the tree is empty */
+	M0_ASSERT(m0_btree_is_empty(tree));
+
+	cred = M0_BE_TX_CREDIT(0, 0);
+	m0_be_allocator_credit(NULL, M0_BAO_FREE_ALIGNED, rnode_sz,
+			       rnode_sz_shift, &cred);
+	m0_btree_destroy_credit(tree, NULL, &cred, 1);
+
+	m0_be_ut_tx_init(tx, ut_be);
+	m0_be_tx_prep(tx, &cred);
+	rc = m0_be_tx_open_sync(tx);
+	M0_ASSERT(rc == 0);
+
+	rc = M0_BTREE_OP_SYNC_WITH_RC(&b_op, m0_btree_destroy(tree, &b_op, tx));
+	M0_ASSERT(rc == 0);
+	M0_SET0(&btree);
+
+	/* Delete temp node space which was used as root node for the tree. */
+	buf = M0_BUF_INIT(rnode_sz, rnode);
+	M0_BE_FREE_ALIGN_BUF_SYNC(&buf, rnode_sz_shift, seg, tx);
+
+	m0_be_tx_close_sync(tx);
+	m0_be_tx_fini(tx);
+
+	if (restart_test) {
+		restart_test = false;
+		/* When restarting test, Re-map the BE segment. */
+		m0_be_seg_close(ut_seg->bus_seg);
+		rc = madvise(rnode, rnode_sz, MADV_NORMAL);
+		M0_ASSERT(rc == -1 && errno == ENOMEM);
+		m0_be_seg_open(ut_seg->bus_seg);
+		m0_nanosleep(m0_time(2, 0), NULL);
+		goto start_lru_test;
+	}
 
 	btree_ut_fini();
 }
@@ -15640,15 +15728,36 @@ static void ut_btree_crc_persist_indir_test(void)
 		},
 		{
 			{
-				BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE,
+				BNT_FIXED_KEYSIZE_VARIABLE_VALUESIZE,
 				sizeof(uint64_t), RANDOM_VALUE_SIZE
+			},
+			M0_BCT_BTREE_ENC_RAW_HASH,
+		},
+		{
+			{
+				BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE,
+				RANDOM_KEY_SIZE, RANDOM_VALUE_SIZE
+			},
+			M0_BCT_NO_CRC,
+		},
+		{
+			{
+				BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE,
+				RANDOM_KEY_SIZE, RANDOM_VALUE_SIZE
+			},
+			M0_BCT_USER_ENC_RAW_HASH,
+		},
+		{
+			{
+				BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE,
+				RANDOM_KEY_SIZE, RANDOM_VALUE_SIZE
 			},
 			M0_BCT_USER_ENC_FORMAT_FOOTER,
 		},
 		{
 			{
-				BNT_FIXED_KEYSIZE_VARIABLE_VALUESIZE,
-				sizeof(uint64_t), RANDOM_VALUE_SIZE
+				BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE,
+				RANDOM_KEY_SIZE, RANDOM_VALUE_SIZE
 			},
 			M0_BCT_BTREE_ENC_RAW_HASH,
 		},
