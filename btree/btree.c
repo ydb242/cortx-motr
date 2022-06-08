@@ -4654,6 +4654,9 @@ static bool fkvv_newval_isfit(struct slot *slot, struct m0_btree_rec *old_rec,
 	if (vsize_diff <= 0)
 		return true;
 
+	if (IS_EMBEDDED_INDIRECT(slot->s_node))
+		return fkvv_indir_isfit(slot->s_node, new_rec);
+
 	if (fkvv_space(slot->s_node) >= vsize_diff)
 		return true;
 	return false;
@@ -13735,6 +13738,10 @@ static void ut_mt_st_indir_kv_oper(void)
 	int i;
 	for (i = 1; i <= BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE; i++)
 	{
+		if (btree_node_format[i] != NULL)
+			btree_ut_kv_oper(0, 1, i, EMBEDDED_INDIRECT);
+	}
+}
 
 static void ut_mt_mt_indir_kv_oper(void)
 {
