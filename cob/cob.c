@@ -351,16 +351,6 @@ static size_t m0_cob_bcrec_size(void)
 	return sizeof(struct m0_cob_bcrec);
 }
 
-static m0_bcount_t bc_ksize(const void *key)
-{
-	return sizeof(struct m0_cob_bckey);
-}
-
-static m0_bcount_t bc_vsize(const void *val)
-{
-	return sizeof(struct m0_cob_bcrec);
-}
-
 /**
  * Make bytecount key for iterator. Allocate space for key.
  */
@@ -418,7 +408,7 @@ M0_INTERNAL int m0_cob_bc_iterator_init(struct m0_cob             *cob,
 		return M0_RC(rc);
 	}
 
-	m0_be_btree_cursor_init(&it->ci_cursor, &cob->co_dom->cd_bytecount);
+	m0_btree_cursor_init(&it->ci_cursor, cob->co_dom->cd_bytecount);
 	it->ci_cob = cob;
 	return M0_RC(rc);
 }
@@ -427,15 +417,17 @@ M0_INTERNAL int m0_cob_bc_iterator_get(struct m0_cob_bc_iterator *it)
 {
 	struct m0_cob_bckey *bckey;
 	struct m0_cob_bcrec *bcrec;
+	struct m0_btree_key  r_key;
 	struct m0_buf        key;
 	struct m0_buf        val;
 	int                  rc;
 
 	m0_buf_init(&key, it->ci_key, m0_cob_bckey_size());
 	m0_buf_init(&val, it->ci_rec, m0_cob_bcrec_size());
-	rc = m0_be_btree_cursor_get_sync(&it->ci_cursor, &key, true);
+	r_key.k_data = M0_BUFVEC_INIT_BUF(&key.b_addr, &key.b_nob);
+	rc = m0_btree_cursor_get(&it->ci_cursor, &r_key, true);
 	if (rc == 0) {
-		m0_be_btree_cursor_kv_get(&it->ci_cursor, &key, &val);
+		m0_btree_cursor_kv_get(&it->ci_cursor, &key, &val);
 		bckey = (struct m0_cob_bckey *)key.b_addr;
 		bcrec = (struct m0_cob_bcrec *)val.b_addr;
 
@@ -455,9 +447,9 @@ M0_INTERNAL int m0_cob_bc_iterator_next(struct m0_cob_bc_iterator *it)
 	struct m0_buf        val;
 	int                  rc;
 
-	rc = m0_be_btree_cursor_next_sync(&it->ci_cursor);
+	rc = m0_btree_cursor_next(&it->ci_cursor);
 	if (rc == 0) {
-		m0_be_btree_cursor_kv_get(&it->ci_cursor, &key, &val);
+		m0_btree_cursor_kv_get(&it->ci_cursor, &key, &val);
 		bckey = (struct m0_cob_bckey *)key.b_addr;
 		bcrec = (struct m0_cob_bcrec *)val.b_addr;
 
@@ -471,7 +463,7 @@ M0_INTERNAL int m0_cob_bc_iterator_next(struct m0_cob_bc_iterator *it)
 
 M0_INTERNAL void m0_cob_bc_iterator_fini(struct m0_cob_bc_iterator *it)
 {
-	m0_be_btree_cursor_fini(&it->ci_cursor);
+	m0_btree_cursor_fini(&it->ci_cursor);
 	m0_free(it->ci_key);
 	m0_free(it->ci_rec);
 }
@@ -493,15 +485,15 @@ M0_INTERNAL int m0_cob_bc_entries_dump(struct m0_cob_domain *cdom,
 	M0_PRE(*out_keys == NULL);
 	M0_PRE(*out_recs == NULL);
 
-	if (cdom->cd_bytecount.bb_root == NULL)
+	if (cdom->cd_bytecount == NULL)
 		return M0_ERR(-ENOENT);
 
 	*out_count = 0;
-	m0_be_btree_cursor_init(&it.ci_cursor, &cdom->cd_bytecount);
-	rc = m0_be_btree_cursor_first_sync(&it.ci_cursor);
+	m0_btree_cursor_init(&it.ci_cursor, cdom->cd_bytecount);
+	rc = m0_btree_cursor_first(&it.ci_cursor);
 
 	while (rc != -ENOENT) {
-		rc = m0_be_btree_cursor_next_sync(&it.ci_cursor);
+		rc = m0_btree_cursor_next(&it.ci_cursor);
 		++(*out_count);
 	}
 
@@ -535,24 +527,24 @@ M0_INTERNAL int m0_cob_bc_entries_dump(struct m0_cob_domain *cdom,
 	key_cursor = (struct m0_cob_bckey *)(*out_keys)->b_addr;
 	rec_cursor = (struct m0_cob_bcrec *)(*out_recs)->b_addr;
 
-	rc = m0_be_btree_cursor_first_sync(&it.ci_cursor);
+	rc = m0_btree_cursor_first(&it.ci_cursor);
 
 	/**
 	 * TODO: Iterate over the btree only once, store the key-vals in a list
 	 * while iterating over the btree the 1st time.
 	 */
 	while (rc != -ENOENT) {
-		m0_be_btree_cursor_kv_get(&it.ci_cursor, &key_buf, &rec_buf);
+		m0_btree_cursor_kv_get(&it.ci_cursor, &key_buf, &rec_buf);
 
 		memcpy(key_cursor, key_buf.b_addr, key_buf.b_nob);
 		memcpy(rec_cursor, rec_buf.b_addr, rec_buf.b_nob);
 		key_cursor++;
 		rec_cursor++;
 
-		rc = m0_be_btree_cursor_next_sync(&it.ci_cursor);
+		rc = m0_btree_cursor_next(&it.ci_cursor);
 	}
 
-	m0_be_btree_cursor_fini(&it.ci_cursor);
+	m0_btree_cursor_fini(&it.ci_cursor);
 
 	return M0_RC(0);
 }
@@ -679,11 +671,12 @@ int m0_cob_domain_init(struct m0_cob_domain *dom, struct m0_be_seg *seg)
 
 	M0_ALLOC_PTR(dom->cd_bytecount);
 	M0_ASSERT(dom->cd_bytecount);
+	keycmp.rko_keycmp = bc_cmp;
 	rc = M0_BTREE_OP_SYNC_WITH_RC(&b_op,
 				      m0_btree_open(&dom->cd_bc_node,
 						    sizeof dom->cd_bc_node,
 						    dom->cd_bytecount, seg,
-						    &b_op));
+						    &b_op, &keycmp));
 	M0_ASSERT(rc == 0);
 
 	m0_rwlock_init(&dom->cd_lock.bl_u.rwlock);
@@ -804,7 +797,7 @@ M0_INTERNAL int m0_cob_domain_credit_add(struct m0_cob_domain          *dom,
 				    .ksize = m0_cob_bckey_size(),
 				    .vsize = m0_cob_bcrec_size(),
 				   };
-	m0_btree_create_credit(&bt, cred); /** Tree cd_fileattr_ea */
+	m0_btree_create_credit(&bt, cred, 1); /** Tree cd_fileattr_ea */
 
 	m0_free(cdid_str);
 	return M0_RC(0);
@@ -934,14 +927,15 @@ int m0_cob_domain_create_prepared(struct m0_cob_domain          **out,
 		.ksize = m0_cob_bckey_size(),
 		.vsize = m0_cob_bcrec_size(),
 	};
-	fid = M0_FID_TINIT('b', M0_BBT_COB_BYTECOUNT, cdid->id);
+	keycmp.rko_keycmp = bc_cmp;
+	fid = M0_FID_TINIT('b', M0_BT_COB_BYTECOUNT, cdid->id);
 	M0_ALLOC_PTR(dom->cd_bytecount);
 	rc = M0_BTREE_OP_SYNC_WITH_RC(&b_op,
 				      m0_btree_create(&dom->cd_bc_node,
 						      sizeof dom->cd_bc_node,
-						      &bt, &b_op,
+						      &bt, M0_BCT_NO_CRC, &b_op,
 						      dom->cd_bytecount, seg,
-						      &fid, tx));
+						      &fid, tx, &keycmp));
 	M0_ASSERT(rc == 0);
 
 	data = M0_BUF_INIT_PTR(&dom);
@@ -1423,7 +1417,7 @@ M0_INTERNAL int m0_cob_bc_lookup(struct m0_cob *cob,
 	m0_buf_init(&key, bc_key, m0_cob_bckey_size());
 	m0_buf_init(&val, bc_rec, m0_cob_bcrec_size());
 
-	rc = cob_table_lookup(&cob->co_dom->cd_bytecount, &key, &val);
+	rc = cob_table_lookup(cob->co_dom->cd_bytecount, &key, &val);
 	if (rc == 0)
 		cob->co_flags |= M0_CA_BCREC;
 	return M0_RC(rc);
@@ -1444,7 +1438,7 @@ M0_INTERNAL int m0_cob_bc_insert(struct m0_cob *cob,
 	m0_buf_init(&key, bc_key, m0_cob_bckey_size());
 	m0_buf_init(&val, bc_val, m0_cob_bcrec_size());
 
-	rc = cob_table_insert(&cob->co_dom->cd_bytecount, tx, &key, &val);
+	rc = cob_table_insert(cob->co_dom->cd_bytecount, tx, &key, &val);
 	if (rc == 0)
 		cob->co_flags |= M0_CA_BCREC;
 	return M0_RC(rc);
@@ -1466,7 +1460,7 @@ M0_INTERNAL int m0_cob_bc_update(struct m0_cob *cob,
 	m0_buf_init(&key, bc_key, m0_cob_bckey_size());
 	m0_buf_init(&val, bc_val, m0_cob_bcrec_size());
 
-	rc = cob_table_update(&cob->co_dom->cd_bytecount, tx, &key, &val);
+	rc = cob_table_update(cob->co_dom->cd_bytecount, tx, &key, &val);
 	if (rc == 0)
 		cob->co_flags |= M0_CA_BCREC;
 	return M0_RC(rc);
@@ -2697,15 +2691,15 @@ M0_INTERNAL void m0_cob_tx_credit(struct m0_cob_domain *dom,
 		TCREDIT(dom->cd_object_index, UPDATE, OI, accum);
 		break;
 	case M0_COB_OP_BYTECOUNT_SET:
-		TCREDIT(&dom->cd_bytecount, INSERT, BC, accum);
+		TCREDIT(dom->cd_bytecount, INSERT, BC, accum);
 		break;
 	case M0_COB_OP_BYTECOUNT_DEL:
-		TCREDIT(&dom->cd_bytecount, DELETE, BC, accum);
+		TCREDIT(dom->cd_bytecount, DELETE, BC, accum);
 		break;
 	case M0_COB_OP_BYTECOUNT_UPDATE:
-		TCREDIT(&dom->cd_bytecount, INSERT, BC, accum);
-		TCREDIT(&dom->cd_bytecount, DELETE, BC, accum);
-		TCREDIT(&dom->cd_bytecount, UPDATE, BC, accum);
+		TCREDIT(dom->cd_bytecount, INSERT, BC, accum);
+		TCREDIT(dom->cd_bytecount, DELETE, BC, accum);
+		TCREDIT(dom->cd_bytecount, UPDATE, BC, accum);
 		break;
 	default:
 		M0_IMPOSSIBLE("Impossible cob optype");

@@ -665,7 +665,7 @@ struct m0_cob_ea_iterator {
  */
 struct m0_cob_bc_iterator {
 	struct m0_cob            *ci_cob;      /**< the cob we iterate */
-	struct m0_be_btree_cursor ci_cursor;   /**< cob iterator cursor */
+	struct m0_btree_cursor    ci_cursor;   /**< cob iterator cursor */
 	struct m0_cob_bckey      *ci_key;      /**< current iterator pos */
 	struct m0_cob_bcrec      *ci_rec;      /**< current iterator rec */
 };
