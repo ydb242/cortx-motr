@@ -3089,6 +3089,8 @@ static bool ff_compaction_check(struct slot *slot)
 
 static void ff_compaction(struct slot *slot)
 {
+	/* Don't do anything here as FF currently won't be doing node
+	   compaction. */
 	return;
 }
 
@@ -4417,6 +4419,8 @@ static bool fkvv_compaction_check(struct slot *slot)
 
 static void fkvv_compaction(struct slot *slot)
 {
+	/* Don't do anything here as FKVV currently won't be doing node
+	   compaction. */
 	return;
 }
 
@@ -6107,20 +6111,6 @@ static bool vkvv_invariant(const struct nd *node)
 		    BNT_VARIABLE_KEYSIZE_VARIABLE_VALUESIZE);
 }
 
-static bool vkvv_cmp_keys(struct m0_btree_key k1, struct m0_btree_key k2)
-{
-	struct m0_bufvec_cursor cur_prev;
-	struct m0_bufvec_cursor cur_next;
-	int                     diff;
-
-	m0_bufvec_cursor_init(&cur_prev, &k1.k_data);
-	m0_bufvec_cursor_init(&cur_next, &k2.k_data);
-	diff = m0_bufvec_cursor_cmp(&cur_prev, &cur_next);
-	if (diff >= 0)
-		return false;
-	return true;
-}
-
 static bool vkvv_iskey_smaller(const struct nd *node, int cur_key_idx)
 {
 	struct m0_btree_key      key_prev;
@@ -6250,7 +6240,7 @@ static void vkvv_dir_entry_delete(const struct nd *node, int idx)
 
 	/**
 	 * Increase the size of last free fragment of value (i.e.fragment
-	 * beetween directory and last valid value).
+	 * between directory and last valid value).
 	 */
 	dir[h->vkvv_dir_entries - 1].val_offset     -= sizeof(*dir);
 	dir[h->vkvv_dir_entries - 1].alloc_val_size += sizeof(*dir);
@@ -6356,12 +6346,9 @@ static void vkvv_compaction(struct slot *slot)
 	struct vkvv_dir_rec *dir           = vkvv_dir_get(slot->s_node);
 	int                  dir_rec_count = h->vkvv_dir_entries;
 	struct vkvv_dir_rec  new_dir[dir_rec_count];
-	struct vkvv_dir_rec  old_dir[dir_rec_count];
 	int                  i             = 0;
-	int                  c1            = 0;
-	int                  c2            = 0;
+	int                  cnt_free_frag = 0;
 
-	memcpy(old_dir, dir, sizeof(*dir) * dir_rec_count);
 	memcpy(new_dir, dir, sizeof(*dir) * dir_rec_count);
 	vkvv_sort_dir(new_dir, dir_rec_count);
 	i = 0;
@@ -6448,7 +6435,6 @@ static void vkvv_compaction(struct slot *slot)
 				new_dir[i+1].alloc_val_size  += curr_vhole;
 				dir[next_idx].alloc_val_size += curr_vhole;
 			}
-			c1++;
 		} else if (vkvv_is_rec_without_hole(curr_ent)) {
 			/* Do not do anything */
 		} else if (vkvv_is_rec_free_frag(curr_ent)) {
@@ -6479,7 +6465,7 @@ static void vkvv_compaction(struct slot *slot)
 						   curr_idx - 1));
 
 			h->vkvv_dir_entries--;
-			c2++;
+			cnt_free_frag++;
 		} else {
 			M0_LOG(M0_ERROR, "Unexpected area for compaction.."
 					  "doing nothing");
@@ -6487,8 +6473,10 @@ static void vkvv_compaction(struct slot *slot)
 		i++;
 	}
 
-	dir[h->vkvv_dir_entries - 1].alloc_val_size += (sizeof(*dir) * c2);
-	dir[h->vkvv_dir_entries - 1].val_offset     -= (sizeof(*dir) * c2);
+	dir[h->vkvv_dir_entries - 1].alloc_val_size +=
+						(sizeof(*dir) * cnt_free_frag);
+	dir[h->vkvv_dir_entries - 1].val_offset     -=
+						(sizeof(*dir) * cnt_free_frag);
 }
 
 static void vkvv_done(struct slot *slot, bool modified)
@@ -7286,210 +7274,6 @@ static void vkvv_capture(struct slot *slot, int cr, struct m0_be_tx *tx)
 		hsize += sizeof(h->vkvv_opaque);
 
 	M0_BTREE_TX_CAPTURE(tx, seg, h, hsize);
-}
-
-M0_UNUSED static uint64_t vkvv_dbg_key(const struct nd *node, int idx)
-{
-    return m0_byteorder_be64_to_cpu(*((uint64_t*)(vkvv_key(node, idx))));
-}
-
-M0_UNUSED static char* vkvv_dbg_tree(struct td *tree, char *buf, int max)
-{
-    struct nd  *root    = tree->t_root;
-    struct nd **queue   = m0_alloc(1000 * sizeof(struct nd *));
-    int         front   = 0;
-    int         rear    = 0;
-    int         filled  = 0;
-
-    queue[front] = root;
-    while (front != -1 && rear != -1) {
-        /* pop one elemet */
-        struct nd* node = queue[front];
-        int level;
-        if (front == rear) {
-            front = -1;
-            rear = -1;
-        } else
-            front++;
-        filled += snprintf(&buf[filled], (max-filled), ">");
-        M0_ASSERT(filled < max);
-        level = bnode_level(node);
-        if (level > 0) {
-            int total_count = bnode_count(node);
-            int j;
-            struct segaddr child_node_addr;
-            struct slot    node_slot = {};
-            struct node_op  i_nop;
-            filled += snprintf(&buf[filled], (max-filled), "\n L%d:", level);
-            M0_ASSERT(filled < max);
-            for(j=0 ; j < total_count; j++) {
-                struct segaddr child_addr;
-                struct slot    nd_slot = {};
-                struct node_op  ic_nop = {};
-                uint64_t key = vkvv_dbg_key(node, j);
-
-                filled += snprintf(&buf[filled], (max-filled), "%"PRIu64",", key);
-                M0_ASSERT(filled < max);
-                nd_slot.s_node = node;
-                nd_slot.s_idx = j;
-                bnode_child(&nd_slot, &child_addr);
-                ic_nop.no_opc = NOP_LOAD;
-                bnode_get(&ic_nop, tree, &child_addr, P_NEXTDOWN);
-                if (front == -1) {
-                    front = 0;
-                }
-                rear++;
-                if (rear == 9999) {
-                    /* printf("***********OVERFLW***********"); */
-                    M0_LOG(M0_ALWAYS,"Overflow !!!!!!");
-                    break;
-                }
-                queue[rear] = ic_nop.no_node;
-            }
-            /* store last child: */
-            node_slot.s_node = node;
-            node_slot.s_idx = j;
-            bnode_child(&node_slot, &child_node_addr);
-            i_nop.no_opc = NOP_LOAD;
-            bnode_get(&i_nop, tree, &child_node_addr, P_NEXTDOWN);
-            if (front == -1) {
-                front = 0;
-            }
-            rear++;
-            if (rear == 9999) {
-                /* printf("***********OVERFLW***********"); */
-                M0_LOG(M0_ALWAYS,"Overflow !!!!!!");
-                break;
-            }
-            queue[rear] = i_nop.no_node;
-            filled += snprintf(&buf[filled], (max-filled), ">");
-            M0_ASSERT(filled < max);
-        } else {
-            int j;
-            int total_count = bnode_count(node);
-            filled += snprintf(&buf[filled], (max-filled), "L%d:", level);
-            M0_ASSERT(filled < max);
-            for(j=0 ; j < total_count; j++)
-            {
-                uint64_t key = vkvv_dbg_key(node, j);
-                filled += snprintf(&buf[filled], (max-filled), "%"PRIu64",",
-				   key);
-                M0_ASSERT(filled < max);
-            }
-            filled += snprintf(&buf[filled], (max-filled), ">");
-            M0_ASSERT(filled < max);
-        }
-    }
-    m0_free(queue);
-    return buf;
-}
-
-M0_UNUSED static void check_dbg_tree(struct td *tree)
-{
-	struct nd *root = tree->t_root;
-	struct nd **queue = m0_alloc(1000 * sizeof(struct nd *));
-	int front = 0, rear = 0;
-	struct slot prev;
-	struct slot next;
-	struct nd *prev_node;
-	int prev_idx;
-	bool is_first = true;
-
-	void                    *p_key_prev;
-	m0_bcount_t              ksize_prev;
-	void                    *p_key_next;
-	m0_bcount_t              ksize_next;
-	prev.s_rec.r_key.k_data = M0_BUFVEC_INIT_BUF(&p_key_prev, &ksize_prev);
-	next.s_rec.r_key.k_data = M0_BUFVEC_INIT_BUF(&p_key_next, &ksize_next);
-
-    queue[front] = root;
-    while (front != -1 && rear != -1) {
-	//pop one elemet
-	struct nd* node = queue[front];
-	int level;
-	if (front == rear) {
-	    front = -1;
-	    rear = -1;
-	} else
-	    front++;
-	level = bnode_level(node);
-	if (level > 0) {
-	    int total_count = bnode_count(node);
-	    int j;
-	    struct segaddr child_node_addr;
-	    struct slot    node_slot = {};
-	    struct node_op  i_nop;
-	    for(j=0 ; j < total_count; j++) {
-	        struct segaddr child_addr;
-	        struct slot    nd_slot = {};
-	        struct node_op  ic_nop = {};
-	        nd_slot.s_node = node;
-	        nd_slot.s_idx = j;
-	        bnode_child(&nd_slot, &child_addr);
-	        ic_nop.no_opc = NOP_LOAD;
-	        bnode_get(&ic_nop, tree, &child_addr, P_NEXTDOWN);
-	        if (front == -1) {
-	            front = 0;
-	        }
-	        rear++;
-	        if (rear == 9999) {
-	            // printf("***********OVERFLW***********");
-	            M0_LOG(M0_ALWAYS,"Overflow !!!!!!");
-	            break;
-	        }
-	        queue[rear] = ic_nop.no_node;
-	    }
-	    //store last child:
-	    node_slot.s_node = node;
-	    node_slot.s_idx = j;
-	    bnode_child(&node_slot, &child_node_addr);
-	    i_nop.no_opc = NOP_LOAD;
-	    bnode_get(&i_nop, tree, &child_node_addr, P_NEXTDOWN);
-	    if (front == -1) {
-	        front = 0;
-	    }
-	    rear++;
-	    if (rear == 9999) {
-	        // printf("***********OVERFLW***********");
-	        M0_LOG(M0_ALWAYS,"Overflow !!!!!!");
-	        break;
-	    }
-	    queue[rear] = i_nop.no_node;
-
-	} else {
-	    int j;
-	    int total_count = bnode_count(node);
-	    for(j = 0 ; j < total_count; j++) {
-		next.s_node = node;
-		next.s_idx = j;
-		bnode_key(&next);
-		if (!is_first) {
-			prev.s_node = prev_node;
-			prev.s_idx = prev_idx;
-			bnode_key(&prev);
-
-
-			if (vkvv_cmp_keys(prev.s_rec.r_key, next.s_rec.r_key) == false)
-			{
-				char *ln = NULL;
-				#ifndef __KERNEL__
-				ln = malloc(1048576);
-				#endif
-				if (ln != NULL)
-					memset(ln, 0, 1048576);
-
-				M0_LOG(M0_ALWAYS,"PUT T(t=%p) >%s", tree,
-				vkvv_dbg_tree(tree, ln, 1048576));
-				M0_ASSERT(0);
-			}
-		} else
-			is_first = false;
-		prev_node = node;
-		prev_idx = j;
-	    }
-	}
-    }
-    m0_free(queue);
 }
 
 static void vkvv_node_alloc_credit(const struct nd *node,
